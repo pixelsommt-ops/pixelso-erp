@@ -1,0 +1,307 @@
+// Prisma schema for ERP Digital Printing Pixelso
+// Generated from ERD in BRD_PRD_ERD dokumen "Versi Sempurna" (section 4)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- M01: User & Role Management ----------
+
+model Role {
+  roleId        Int      @id @default(autoincrement()) @map("role_id")
+  roleName      String   @unique @map("role_name")
+  permissionSet Json?    @map("permission_set")
+  users         User[]
+
+  @@map("roles")
+}
+
+model Team {
+  teamId Int    @id @default(autoincrement()) @map("team_id")
+  name   String
+  users  User[]
+
+  @@map("teams")
+}
+
+model User {
+  userId     Int      @id @default(autoincrement()) @map("user_id")
+  name       String
+  email      String   @unique
+  password   String
+  roleId     Int      @map("role_id")
+  teamId     Int?     @map("team_id")
+  status     String   @default("active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  role Role  @relation(fields: [roleId], references: [roleId])
+  team Team? @relation(fields: [teamId], references: [teamId])
+
+  designedOrders ProductionOrder[] @relation("designer")
+  cashierSales   SalesPos[]        @relation("cashier")
+  operatorTasks  ProductionTask[]  @relation("operator")
+  qcChecks       QcCheck[]         @relation("qc_by")
+  bonusRecords   BonusRecord[]
+  dailyKpis      DailyKpi[]
+  notifications  Notification[]
+
+  @@map("users")
+}
+
+// ---------- M02: Customer & CRM ----------
+
+model Customer {
+  customerId Int      @id @default(autoincrement()) @map("customer_id")
+  name       String
+  phone      String?
+  segment    String?
+  source     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  productionOrders ProductionOrder[]
+
+  @@map("customers")
+}
+
+// ---------- M03: Production Order / PO ----------
+
+model Product {
+  productId Int     @id @default(autoincrement()) @map("product_id")
+  name      String
+  category  String?
+  basePrice Decimal @default(0) @map("base_price") @db.Decimal(14, 2)
+  unit      String?
+
+  poDetails PoDetail[]
+
+  @@map("products")
+}
+
+model ProductionOrder {
+  poId       Int      @id @default(autoincrement()) @map("po_id")
+  poNumber   String   @unique @map("po_number")
+  customerId Int      @map("customer_id")
+  designerId Int      @map("designer_id")
+  status     String   @default("draft")
+  priority   Int      @default(0)
+  dueAt      DateTime? @map("due_at")
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [customerId])
+  designer User     @relation("designer", fields: [designerId], references: [userId])
+
+  poDetails       PoDetail[]
+  salesPos        SalesPos?
+  deliveries      Delivery[]
+  stockMovements  StockMovement[]
+
+  @@map("production_orders")
+}
+
+model PoDetail {
+  poDetailId Int     @id @default(autoincrement()) @map("po_detail_id")
+  poId       Int     @map("po_id")
+  productId  Int     @map("product_id")
+  qty        Int
+  size       String?
+  fileUrl    String? @map("file_url")
+  specNote   String? @map("spec_note") @db.Text
+
+  productionOrder ProductionOrder  @relation(fields: [poId], references: [poId])
+  product         Product          @relation(fields: [productId], references: [productId])
+  productionTasks ProductionTask[]
+
+  @@map("po_details")
+}
+
+// ---------- M04: POS & Pembayaran ----------
+
+model SalesPos {
+  saleId     Int      @id @default(autoincrement()) @map("sale_id")
+  poId       Int      @unique @map("po_id")
+  cashierId  Int      @map("cashier_id")
+  total      Decimal  @db.Decimal(14, 2)
+  dp         Decimal  @default(0) @db.Decimal(14, 2)
+  paidStatus String   @default("unpaid") @map("paid_status")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  productionOrder ProductionOrder @relation(fields: [poId], references: [poId])
+  cashier         User            @relation("cashier", fields: [cashierId], references: [userId])
+  payments        Payment[]
+
+  @@map("sales_pos")
+}
+
+model Payment {
+  paymentId Int      @id @default(autoincrement()) @map("payment_id")
+  saleId    Int      @map("sale_id")
+  method    String
+  amount    Decimal  @db.Decimal(14, 2)
+  paidAt    DateTime @default(now()) @map("paid_at")
+
+  sale SalesPos @relation(fields: [saleId], references: [saleId])
+
+  @@map("payments")
+}
+
+// ---------- M05: Inventory ----------
+
+model Material {
+  materialId Int     @id @default(autoincrement()) @map("material_id")
+  name       String
+  unit       String
+  stockQty   Decimal @default(0) @map("stock_qty") @db.Decimal(14, 2)
+  minStock   Decimal @default(0) @map("min_stock") @db.Decimal(14, 2)
+  avgCost    Decimal @default(0) @map("avg_cost") @db.Decimal(14, 2)
+
+  stockMovements StockMovement[]
+
+  @@map("materials")
+}
+
+model StockMovement {
+  moveId     Int      @id @default(autoincrement()) @map("move_id")
+  materialId Int      @map("material_id")
+  poId       Int?     @map("po_id")
+  type       String   // in | out | reserve | adjustment
+  qty        Decimal  @db.Decimal(14, 2)
+  createdBy  Int?     @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  material        Material         @relation(fields: [materialId], references: [materialId])
+  productionOrder ProductionOrder? @relation(fields: [poId], references: [poId])
+
+  @@map("stock_movements")
+}
+
+// ---------- M06: Produksi ----------
+
+model Machine {
+  machineId Int    @id @default(autoincrement()) @map("machine_id")
+  name      String
+  type      String?
+  capacity  String?
+  status    String @default("idle")
+
+  productionTasks ProductionTask[]
+
+  @@map("machines")
+}
+
+model ProductionTask {
+  taskId     Int       @id @default(autoincrement()) @map("task_id")
+  poDetailId Int       @map("po_detail_id")
+  machineId  Int?      @map("machine_id")
+  operatorId Int?      @map("operator_id")
+  status     String    @default("queue")
+  startAt    DateTime? @map("start_at")
+  finishAt   DateTime? @map("finish_at")
+
+  poDetail PoDetail @relation(fields: [poDetailId], references: [poDetailId])
+  machine  Machine? @relation(fields: [machineId], references: [machineId])
+  operator User?    @relation("operator", fields: [operatorId], references: [userId])
+  qcChecks QcCheck[]
+
+  @@map("production_tasks")
+}
+
+// ---------- M07: QC & Delivery ----------
+
+model QcCheck {
+  qcId      Int      @id @default(autoincrement()) @map("qc_id")
+  taskId    Int      @map("task_id")
+  qcBy      Int      @map("qc_by")
+  result    String   // pass | fail
+  issueType String?  @map("issue_type")
+  photoUrl  String?  @map("photo_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task ProductionTask @relation(fields: [taskId], references: [taskId])
+  qcBy_user User       @relation("qc_by", fields: [qcBy], references: [userId])
+
+  @@map("qc_checks")
+}
+
+model Delivery {
+  deliveryId Int      @id @default(autoincrement()) @map("delivery_id")
+  poId       Int      @map("po_id")
+  method     String   // pickup | delivery
+  receiver   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  productionOrder ProductionOrder @relation(fields: [poId], references: [poId])
+
+  @@map("deliveries")
+}
+
+// ---------- M08 / M10: Finance, Bonus & HRD Productivity ----------
+
+model BonusRecord {
+  bonusId Int      @id @default(autoincrement()) @map("bonus_id")
+  userId  Int      @map("user_id")
+  period  String   // e.g. "2026-07"
+  source  String   // po | pos | production | qc | marketing
+  score   Decimal  @db.Decimal(10, 2)
+  amount  Decimal  @db.Decimal(14, 2)
+  isAuto  Boolean  @default(false) @map("is_auto")
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@unique([userId, period, source])
+  @@map("bonus_records")
+}
+
+model DailyKpi {
+  kpiId  Int      @id @default(autoincrement()) @map("kpi_id")
+  date   DateTime @db.Date
+  role   String
+  metric String
+  value  Decimal  @db.Decimal(14, 2)
+  userId Int?     @map("user_id")
+
+  user User? @relation(fields: [userId], references: [userId])
+
+  @@map("daily_kpis")
+}
+
+// ---------- M09: Marketing Campaign ----------
+
+model Campaign {
+  campaignId Int       @id @default(autoincrement()) @map("campaign_id")
+  name       String
+  channel    String?
+  startDate  DateTime? @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  budget     Decimal   @default(0) @db.Decimal(14, 2)
+  status     String    @default("planned") // planned | active | completed | cancelled
+  notes      String?   @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("campaigns")
+}
+
+// ---------- M12: Notification & Approval ----------
+
+model Notification {
+  notificationId Int      @id @default(autoincrement()) @map("notification_id")
+  userId         Int      @map("user_id")
+  type           String
+  severity       String
+  message        String   @db.Text
+  refType        String?  @map("ref_type")
+  refId          Int?     @map("ref_id")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@unique([userId, type, refType, refId])
+  @@map("notifications")
+}
