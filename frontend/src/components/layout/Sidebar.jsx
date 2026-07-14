@@ -18,36 +18,38 @@ const NAV_ITEMS = [
   { to: '/hrd', label: 'HRD Productivity', roles: null },
   { to: '/customers', label: 'Customer & CRM', roles: null },
   { to: '/users', label: 'User & Role', roles: ['manager'] },
+  { to: '/pricing', label: 'Harga Website (Kalkulator)', roles: ['manager'] },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   const { role } = useAuth();
   const items = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role));
 
   return (
-    <nav style={{ width: 220, borderRight: '1px solid var(--color-border)', padding: '1rem', background: '#fff' }}>
-      <div style={{ fontWeight: 700, marginBottom: '1rem' }}>Pixelso ERP</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {items.map((item) => (
-          <li key={item.to} style={{ marginBottom: '0.25rem' }}>
-            <NavLink
-              to={item.to}
-              end={item.to === '/'}
-              style={({ isActive }) => ({
-                display: 'block',
-                padding: '0.5rem 0.6rem',
-                borderRadius: 6,
-                textDecoration: 'none',
-                color: isActive ? '#fff' : 'var(--color-text)',
-                background: isActive ? 'var(--color-primary)' : 'transparent',
-                fontSize: '0.88rem',
-              })}
-            >
-              {item.label}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <>
+      {open && <div className="sidebar-backdrop" onClick={onClose} />}
+      <nav className={`sidebar ${open ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-header">
+          <span className="sidebar-title">Pixelso ERP</span>
+          <button type="button" className="sidebar-close" onClick={onClose} aria-label="Tutup menu">
+            &times;
+          </button>
+        </div>
+        <ul className="sidebar-nav">
+          {items.map((item) => (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                end={item.to === '/'}
+                onClick={onClose}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
   );
 }

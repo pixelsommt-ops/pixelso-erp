@@ -82,6 +82,36 @@ model Product {
   @@map("products")
 }
 
+// ---------- Harga website publik (satu-satunya sumber untuk kalkulator landing page) ----------
+// Bentuknya mengikuti data/config.json (pricing) di app pixelso_nodejs - lihat ERP_INTEGRATION.md di app itu.
+
+model PricingSetting {
+  id              Int      @id @default(1) // baris tunggal (singleton), dijaga di level aplikasi bukan DB
+  designFee       Decimal  @default(0) @map("design_fee") @db.Decimal(14, 2)
+  materialFactors Json     @map("material_factors")
+  finishingRates  Json     @map("finishing_rates")
+  updatedBy       Int?     @map("updated_by")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("pricing_settings")
+}
+
+model PrintProduct {
+  printProductId Int      @id @default(autoincrement()) @map("print_product_id")
+  key            String   @unique
+  name           String
+  pricingMode    String   @map("pricing_mode") // 'area' | 'unit'
+  baseRate       Decimal  @default(0) @map("base_rate") @db.Decimal(14, 2)
+  minimumArea    Decimal  @default(0) @map("minimum_area") @db.Decimal(10, 4)
+  setupFee       Decimal  @default(0) @map("setup_fee") @db.Decimal(14, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  updatedBy      Int?     @map("updated_by")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("print_products")
+}
+
 model ProductionOrder {
   poId       Int      @id @default(autoincrement()) @map("po_id")
   poNumber   String   @unique @map("po_number")

@@ -21,6 +21,8 @@ const marketingRoutes = require('./modules/marketing/marketing.routes');
 const hrdRoutes = require('./modules/hrd/hrd.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const pricingRoutes = require('./modules/pricing/pricing.routes');
+const publicPricingRoutes = require('./modules/pricing/pricing.public.routes');
 
 const app = express();
 
@@ -60,6 +62,9 @@ app.use('/api/hrd', hrdRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 // M12
 app.use('/api/notifications', notificationsRoutes);
+// Harga website (kalkulator landing page) - satu-satunya sumber, lihat pixelso_nodejs/ERP_INTEGRATION.md
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/public/pricing', publicPricingRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

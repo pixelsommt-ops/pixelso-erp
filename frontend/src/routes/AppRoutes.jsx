@@ -15,6 +15,7 @@ import FinancePage from '../pages/finance';
 import MarketingPage from '../pages/marketing';
 import HrdPage from '../pages/hrd';
 import UsersPage from '../pages/users';
+import PricingPage from '../pages/pricing';
 
 export default function AppRoutes() {
   return (
@@ -35,6 +36,7 @@ export default function AppRoutes() {
           <Route path="/marketing" element={<MarketingPage />} />
           <Route path="/hrd" element={<HrdPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
         </Route>
       </Route>
 

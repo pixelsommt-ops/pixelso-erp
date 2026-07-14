@@ -6,4 +6,5 @@ module.exports = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  landingPageApiKey: process.env.LANDING_PAGE_API_KEY,
 };
