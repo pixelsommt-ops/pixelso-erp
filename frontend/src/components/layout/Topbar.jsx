@@ -4,7 +4,7 @@ import useFetch from '../../hooks/useFetch';
 import * as notificationsService from '../../services/notificationsService';
 import NotificationsFeed from '../common/NotificationsFeed';
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }) {
   const { user, logout } = useAuthStore();
   const [bellOpen, setBellOpen] = useState(false);
 
@@ -13,18 +13,15 @@ export default function Topbar() {
   const count = alerts?.filter((a) => !a.isRead).length || 0;
 
   return (
-    <header
-      style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        gap: '1rem',
-        padding: '0.75rem 1.5rem',
-        borderBottom: '1px solid var(--color-border)',
-        background: '#fff',
-        position: 'relative',
-      }}
-    >
+    <header className="topbar">
+      <button type="button" className="hamburger-btn" onClick={onMenuClick} aria-label="Buka menu">
+        <span />
+        <span />
+        <span />
+      </button>
+
+      <div className="topbar-spacer" />
+
       <div style={{ position: 'relative' }}>
         <button type="button" className="btn btn-sm" onClick={() => setBellOpen((v) => !v)}>
           Notifikasi{count > 0 ? ` (${count})` : ''}
@@ -35,24 +32,13 @@ export default function Topbar() {
               style={{ position: 'fixed', inset: 0, zIndex: 40 }}
               onClick={() => setBellOpen(false)}
             />
-            <div
-              className="card"
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: '2.4rem',
-                width: 340,
-                maxHeight: 400,
-                overflowY: 'auto',
-                zIndex: 50,
-              }}
-            >
+            <div className="card notif-dropdown">
               <NotificationsFeed compact alerts={alerts} onReload={reload} />
             </div>
           </>
         )}
       </div>
-      <span className="text-sm">
+      <span className="text-sm topbar-user">
         {user?.name || 'Guest'} <span className="text-muted">({user?.role})</span>
       </span>
       <button type="button" className="btn btn-sm" onClick={logout}>
