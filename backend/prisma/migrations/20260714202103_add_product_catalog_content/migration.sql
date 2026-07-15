@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `print_products` ADD COLUMN `description` TEXT NULL,
+    ADD COLUMN `image_url` VARCHAR(191) NULL,
+    ADD COLUMN `specs` JSON NULL;
+

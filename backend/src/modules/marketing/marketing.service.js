@@ -29,7 +29,7 @@ async function getTopProducts(query) {
 
   const details = await prisma.poDetail.findMany({
     where: { productionOrder: { ...CONFIRMED_ORDER_WHERE, createdAt: { gte: from, lte: to } } },
-    include: { product: { select: { productId: true, name: true, category: true } } },
+    include: { product: { select: { productId: true, name: true, category: { select: { name: true } } } } },
   });
 
   const byProduct = new Map();
@@ -38,7 +38,7 @@ async function getTopProducts(query) {
     const entry = byProduct.get(key) || {
       productId: key,
       name: d.product.name,
-      category: d.product.category,
+      category: d.product.category?.name || null,
       totalQty: 0,
       orderCount: 0,
       poIds: new Set(),

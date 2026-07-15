@@ -136,7 +136,11 @@ async function update(id, data, currentUser) {
       throw new ApiError(400, 'payment requires amount > 0 and method');
     }
 
-    const paidSoFar = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    // Cuma payment yang sudah confirmed dihitung "sudah lunas" - bukti transfer storefront yang
+    // masih pending tidak boleh bikin order kelihatan lunas sebelum staf verifikasi.
+    const paidSoFar = sale.payments
+      .filter((p) => p.status === 'confirmed')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
     const remaining = Number(sale.total) - paidSoFar;
     if (amount > remaining) {
       throw new ApiError(400, `payment amount exceeds remaining balance (${remaining})`);
@@ -156,4 +160,45 @@ async function update(id, data, currentUser) {
   throw new ApiError(400, 'Nothing to update: provide payment or void');
 }
 
-module.exports = { list, getById, create, update };
+// Staf konfirmasi/tolak bukti transfer yang diupload pelanggan lewat storefront (Payment.status 'pending').
+async function confirmPayment(saleId, paymentId, action, currentUser) {
+  if (!['confirm', 'reject'].includes(action)) {
+    throw new ApiError(400, "action must be 'confirm' or 'reject'");
+  }
+
+  const sale = await prisma.salesPos.findUnique({ where: { saleId: Number(saleId) }, include: { payments: true } });
+  if (!sale) {
+    throw new ApiError(404, 'Sale not found');
+  }
+  const payment = sale.payments.find((p) => p.paymentId === Number(paymentId));
+  if (!payment) {
+    throw new ApiError(404, 'Payment not found on this sale');
+  }
+  if (payment.status !== 'pending') {
+    throw new ApiError(400, `Payment already ${payment.status}`);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { paymentId: Number(paymentId) },
+      data: {
+        status: action === 'confirm' ? 'confirmed' : 'rejected',
+        confirmedBy: currentUser.userId,
+        confirmedAt: new Date(),
+      },
+    });
+
+    const confirmedPaid = sale.payments
+      .filter((p) => p.paymentId !== Number(paymentId) && p.status === 'confirmed')
+      .reduce((sum, p) => sum + Number(p.amount), 0)
+      + (action === 'confirm' ? Number(payment.amount) : 0);
+
+    return tx.salesPos.update({
+      where: { saleId: Number(saleId) },
+      data: { paidStatus: paidStatusFor(Number(sale.total), confirmedPaid) },
+      include: DETAIL_INCLUDE,
+    });
+  });
+}
+
+module.exports = { list, getById, create, update, confirmPayment };

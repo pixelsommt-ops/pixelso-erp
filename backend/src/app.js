@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -23,12 +24,28 @@ const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
 const pricingRoutes = require('./modules/pricing/pricing.routes');
 const publicPricingRoutes = require('./modules/pricing/pricing.public.routes');
+const storefrontRoutes = require('./modules/storefront/storefront.routes');
+const settingsRoutes = require('./modules/settings/settings.routes');
+const promoRoutes = require('./modules/promo/promo.routes');
+const categoryRoutes = require('./modules/category/category.routes');
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.corsOrigin }));
-app.use(express.json());
+app.use(cors({
+  origin: config.corsOrigin.includes('*')
+    ? true
+    : (origin, callback) => {
+        if (!origin || config.corsOrigin.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+      },
+}));
+// Limit dinaikkan dari default 100kb - file diupload sebagai base64 di body JSON (bukan file
+// mentah), base64 nambah ~33% ukuran. File desain (kind 'design') boleh sampai 50MB asli
+// (lihat storefrontUploadMaxDesignBytes di common/utils/fileUpload.js) - butuh ~68MB base64,
+// jadi limit body di sini dinaikkan ke 70mb supaya tidak ketolak duluan sebelum sampai saveUpload().
+app.use(express.json({ limit: '70mb' }));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 if (config.nodeEnv !== 'test') {
   app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'));
 }
@@ -65,6 +82,14 @@ app.use('/api/notifications', notificationsRoutes);
 // Harga website (kalkulator landing page) - satu-satunya sumber, lihat pixelso_nodejs/ERP_INTEGRATION.md
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/public/pricing', publicPricingRoutes);
+// Storefront pelanggan (register/login/katalog/checkout/order) - lihat ~/pixelso-storefront
+app.use('/api/storefront', storefrontRoutes);
+// Identitas & konten halaman depan storefront (alamat, sosmed, foto hero/pendukung)
+app.use('/api/settings', settingsRoutes);
+// Promo storefront (manager-only CRUD - endpoint publik lewat /api/storefront/promos)
+app.use('/api/promos', promoRoutes);
+// Master Kategori - dipakai bareng Master Produk (internal) dan katalog storefront (Pricing)
+app.use('/api/categories', categoryRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

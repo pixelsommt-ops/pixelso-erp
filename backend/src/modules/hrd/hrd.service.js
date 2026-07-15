@@ -102,6 +102,7 @@ async function getProductivityReport(query) {
   const slaHours = query.slaHours ? Number(query.slaHours) : 24;
 
   const users = await prisma.user.findMany({
+    where: { isSystem: false }, // kecualikan akun sistem (checkout storefront) dari laporan produktivitas staf
     select: { userId: true, name: true, role: { select: { roleName: true } } },
   });
 

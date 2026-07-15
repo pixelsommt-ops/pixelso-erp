@@ -118,7 +118,8 @@ async function getRevenueReport(query) {
   const { from, to } = parseRange(query);
 
   const payments = await prisma.payment.findMany({
-    where: { paidAt: { gte: from, lte: to } },
+    // Bukti transfer storefront yang masih 'pending' belum diverifikasi staf - jangan ikut terhitung omzet.
+    where: { paidAt: { gte: from, lte: to }, status: 'confirmed' },
     include: { sale: { select: { saleId: true, poId: true, paidStatus: true } } },
   });
   const validPayments = payments.filter((p) => p.sale.paidStatus !== 'void');
@@ -174,12 +175,13 @@ async function autoCalculateBonus(period) {
   const [orders, sales, tasks, qcChecks] = await Promise.all([
     prisma.productionOrder.groupBy({
       by: ['designerId'],
-      where: { createdAt: { gte: from, lte: to }, status: { not: 'draft' } },
+      // User sistem (checkout storefront) dikecualikan supaya tidak dapat bonus_records palsu.
+      where: { createdAt: { gte: from, lte: to }, status: { not: 'draft' }, designer: { isSystem: false } },
       _count: { designerId: true },
     }),
     prisma.salesPos.groupBy({
       by: ['cashierId'],
-      where: { createdAt: { gte: from, lte: to }, paidStatus: { not: 'void' } },
+      where: { createdAt: { gte: from, lte: to }, paidStatus: { not: 'void' }, cashier: { isSystem: false } },
       _count: { cashierId: true },
     }),
     prisma.productionTask.groupBy({

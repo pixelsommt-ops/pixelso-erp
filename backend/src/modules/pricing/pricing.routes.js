@@ -19,5 +19,6 @@ router.get('/products/:key', controller.getProduct);
 router.post('/products', controller.createProduct);
 router.put('/products/:key', controller.updateProduct);
 router.delete('/products/:key', controller.deleteProduct);
+router.post('/uploads', controller.uploadPhoto);
 
 module.exports = router;

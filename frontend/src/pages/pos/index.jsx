@@ -72,8 +72,11 @@ export default function PosPage() {
   };
   const closeDetail = () => setDetail(null);
 
+  // Payment yang masih pending (bukti transfer storefront belum diverifikasi) tidak dihitung
+  // sebagai sudah dibayar - konsisten dengan pos.service.js#update() di backend.
   const remaining = detail
-    ? Number(detail.total) - detail.payments.reduce((sum, p) => sum + Number(p.amount), 0)
+    ? Number(detail.total) -
+      detail.payments.filter((p) => p.status === 'confirmed').reduce((sum, p) => sum + Number(p.amount), 0)
     : 0;
 
   const submitPayment = async (e) => {
@@ -90,6 +93,20 @@ export default function PosPage() {
       reload();
     } catch (err) {
       setActionError(err?.response?.data?.message || 'Gagal menambah pembayaran');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const handleConfirmPayment = async (paymentId, action) => {
+    setActionError('');
+    setActioning(true);
+    try {
+      const { data } = await posService.confirmPayment(detail.saleId, paymentId, action);
+      setDetail(data);
+      reload();
+    } catch (err) {
+      setActionError(err?.response?.data?.message || 'Gagal memproses konfirmasi pembayaran');
     } finally {
       setActioning(false);
     }
@@ -231,7 +248,10 @@ export default function PosPage() {
                 <tr>
                   <th>Metode</th>
                   <th>Jumlah</th>
+                  <th>Status</th>
+                  <th>Bukti</th>
                   <th>Waktu</th>
+                  {canManagePayment && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -239,7 +259,47 @@ export default function PosPage() {
                   <tr key={p.paymentId}>
                     <td>{p.method}</td>
                     <td>{formatCurrency(p.amount)}</td>
+                    <td>
+                      <StatusBadge status={p.status || 'confirmed'} />
+                    </td>
+                    <td>
+                      {p.proofUrl ? (
+                        <a href={p.proofUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={p.proofUrl}
+                            alt="Bukti transfer"
+                            style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }}
+                          />
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td>{formatDateTime(p.paidAt)}</td>
+                    {canManagePayment && (
+                      <td>
+                        {p.status === 'pending' && (
+                          <div className="btn-group">
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              disabled={actioning}
+                              onClick={() => handleConfirmPayment(p.paymentId, 'confirm')}
+                            >
+                              Konfirmasi
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm"
+                              disabled={actioning}
+                              onClick={() => handleConfirmPayment(p.paymentId, 'reject')}
+                            >
+                              Tolak
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

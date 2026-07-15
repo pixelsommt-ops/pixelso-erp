@@ -9,3 +9,6 @@ export const update = (id, payload) => apiClient.put(`${BASE}/${id}`, payload).t
 
 export const addPayment = (id, payment) => update(id, { payment });
 export const voidSale = (id) => update(id, { void: true });
+
+export const confirmPayment = (saleId, paymentId, action) =>
+  apiClient.put(`${BASE}/${saleId}/payments/${paymentId}`, { action }).then((res) => res.data);

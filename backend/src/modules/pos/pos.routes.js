@@ -14,5 +14,6 @@ router.get('/', controller.list);
 router.get('/:id', controller.getById);
 router.post('/', authorize(ROLES.CASHIER, ROLES.MANAGER), controller.create);
 router.put('/:id', authorize(ROLES.CASHIER, ROLES.MANAGER, ROLES.FINANCE), controller.update);
+router.put('/:id/payments/:paymentId', authorize(ROLES.CASHIER, ROLES.MANAGER, ROLES.FINANCE), controller.confirmPayment);
 
 module.exports = router;

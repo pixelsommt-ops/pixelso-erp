@@ -21,6 +21,7 @@ async function list(query) {
   const { roleId, status, search } = query;
 
   const where = {
+    isSystem: false, // akun sistem (checkout storefront) tidak pernah muncul di direktori staf
     ...(roleId ? { roleId: Number(roleId) } : {}),
     ...(status ? { status } : {}),
     ...(search

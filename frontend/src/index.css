@@ -538,3 +538,18 @@ input:focus, select:focus, textarea:focus {
     z-index: 90;
   }
 }
+
+.rich-text-editor:empty:before {
+  content: attr(data-placeholder);
+  color: var(--color-text-muted);
+}
+
+.rich-text-editor ul,
+.rich-text-editor ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+
+.rich-text-editor p {
+  margin: 0 0 0.6em;
+}

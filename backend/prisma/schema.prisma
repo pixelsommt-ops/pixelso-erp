@@ -37,18 +37,20 @@ model User {
   roleId     Int      @map("role_id")
   teamId     Int?     @map("team_id")
   status     String   @default("active")
+  isSystem   Boolean  @default(false) @map("is_system") // akun placeholder non-manusia (mis. checkout storefront)
   createdAt  DateTime @default(now()) @map("created_at")
 
   role Role  @relation(fields: [roleId], references: [roleId])
   team Team? @relation(fields: [teamId], references: [teamId])
 
-  designedOrders ProductionOrder[] @relation("designer")
-  cashierSales   SalesPos[]        @relation("cashier")
-  operatorTasks  ProductionTask[]  @relation("operator")
-  qcChecks       QcCheck[]         @relation("qc_by")
-  bonusRecords   BonusRecord[]
-  dailyKpis      DailyKpi[]
-  notifications  Notification[]
+  designedOrders    ProductionOrder[] @relation("designer")
+  cashierSales      SalesPos[]        @relation("cashier")
+  operatorTasks     ProductionTask[]  @relation("operator")
+  qcChecks          QcCheck[]         @relation("qc_by")
+  bonusRecords      BonusRecord[]
+  dailyKpis         DailyKpi[]
+  notifications     Notification[]
+  confirmedPayments Payment[]
 
   @@map("users")
 }
@@ -59,6 +61,8 @@ model Customer {
   customerId Int      @id @default(autoincrement()) @map("customer_id")
   name       String
   phone      String?
+  email      String?  @unique // NEW, nullable - row lama (walk-in, dibuat staf) tetap valid tanpa email
+  password   String?  // NEW, nullable - hash bcrypt, cuma diisi akun self-service storefront
   segment    String?
   source     String?
   createdAt  DateTime @default(now()) @map("created_at")
@@ -71,15 +75,41 @@ model Customer {
 // ---------- M03: Production Order / PO ----------
 
 model Product {
-  productId Int     @id @default(autoincrement()) @map("product_id")
-  name      String
-  category  String?
-  basePrice Decimal @default(0) @map("base_price") @db.Decimal(14, 2)
-  unit      String?
+  productId      Int           @id @default(autoincrement()) @map("product_id")
+  name           String
+  categoryId     Int?          @map("category_id")
+  basePrice      Decimal       @default(0) @map("base_price") @db.Decimal(14, 2)
+  unit           String?
+  printProductId Int?          @unique @map("print_product_id") // NEW - link ke katalog storefront (PrintProduct)
 
-  poDetails PoDetail[]
+  poDetails    PoDetail[]
+  printProduct PrintProduct? @relation(fields: [printProductId], references: [printProductId])
+  category     Category?     @relation(fields: [categoryId], references: [categoryId])
 
   @@map("products")
+}
+
+// ---------- Identitas & konten halaman depan storefront (satu-satunya sumber, mis. pricing di atas) ----------
+
+model SiteSettings {
+  id            Int      @id @default(1) // baris tunggal (singleton), dijaga di level aplikasi bukan DB
+  name          String   @default("Pixelso Gemolong")
+  tagline       String?
+  description   String?  @db.Text
+  address       String?  @db.Text
+  openingHours  String?  @map("opening_hours")
+  whatsapp      String?
+  instagram     String?
+  tiktok        String?
+  youtube       String?
+  facebook      String?
+  heroImageUrl  String?  @map("hero_image_url") // deprecated - dipertahankan cuma buat backfill, sudah tidak dibaca aplikasi, lihat heroSlides
+  heroSlides    Json?    @map("hero_slides") // array {url, linkUrl} maks 5 - slideshow hero halaman depan, tiap slide bisa diklik
+  galleryImages Json?    @map("gallery_images") // array {url, caption} - foto pendukung
+  updatedBy     Int?     @map("updated_by")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }
 
 // ---------- Harga website publik (satu-satunya sumber untuk kalkulator landing page) ----------
@@ -101,15 +131,66 @@ model PrintProduct {
   key            String   @unique
   name           String
   pricingMode    String   @map("pricing_mode") // 'area' | 'unit'
+  categoryId     Int?     @map("category_id") // grup untuk menu kategori storefront - lihat model Category
   baseRate       Decimal  @default(0) @map("base_rate") @db.Decimal(14, 2)
   minimumArea    Decimal  @default(0) @map("minimum_area") @db.Decimal(10, 4)
   setupFee       Decimal  @default(0) @map("setup_fee") @db.Decimal(14, 2)
   isActive       Boolean  @default(true) @map("is_active")
   sortOrder      Int      @default(0) @map("sort_order")
+  imageUrl       String?  @map("image_url") // dicache = images[0] - foto utama/thumbnail, sumber kebenaran ada di images
+  images         Json? // array URL foto, maks 4, index 0 = thumbnail utama/pilihan manager
+  videoUrl       String?  @map("video_url") // link video produk (YouTube/Instagram/TikTok), bukan file upload
+  description    String?  @db.Text // deskripsi singkat 1-2 kalimat, tampil di halaman detail storefront
+  specs          Json? // daftar poin spesifikasi teknis, array string, mis. ["Bahan flexi korea", "Anti air"]
   updatedBy      Int?     @map("updated_by")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  product      Product? // NEW - reverse relation ke Product operasional (untuk PoDetail checkout storefront)
+  category     Category?             @relation(fields: [categoryId], references: [categoryId])
+  optionGroups ProductOptionGroup[]
+
   @@map("print_products")
+}
+
+// Varian/opsi per produk untuk Form Order storefront (mis. Bahan, Finishing, Laminasi) -
+// tiap produk punya set grup sendiri, beda dari produk lain (lihat pricing.service.js).
+model ProductOptionGroup {
+  groupId        Int      @id @default(autoincrement()) @map("group_id")
+  printProductId Int      @map("print_product_id")
+  label          String // "Bahan", "Finishing", "Laminasi", dst
+  required       Boolean  @default(true)
+  sortOrder      Int      @default(0) @map("sort_order")
+
+  printProduct PrintProduct          @relation(fields: [printProductId], references: [printProductId], onDelete: Cascade)
+  choices      ProductOptionChoice[]
+
+  @@map("product_option_groups")
+}
+
+model ProductOptionChoice {
+  choiceId   Int      @id @default(autoincrement()) @map("choice_id")
+  groupId    Int      @map("group_id")
+  label      String // "Stiker Chromo", "Tanpa Laminasi", dst
+  priceMode  String   @map("price_mode") // 'replace_base' | 'multiplier' | 'add'
+  priceValue Decimal  @default(0) @map("price_value") @db.Decimal(14, 2)
+  perUnit    Boolean  @default(false) @map("per_unit") // priceMode 'add': kali qty atau flat sekali
+  isDefault  Boolean  @default(false) @map("is_default")
+  sortOrder  Int      @default(0) @map("sort_order")
+
+  group ProductOptionGroup @relation(fields: [groupId], references: [groupId], onDelete: Cascade)
+
+  @@map("product_option_choices")
+}
+
+model Category {
+  categoryId Int      @id @default(autoincrement()) @map("category_id")
+  name       String   @unique
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  products      Product[]
+  printProducts PrintProduct[]
+
+  @@map("categories")
 }
 
 model ProductionOrder {
@@ -143,6 +224,20 @@ model PoDetail {
   fileUrl    String? @map("file_url")
   specNote   String? @map("spec_note") @db.Text
 
+  // NEW - dipakai oleh checkout storefront, snapshot harga & spesifikasi kalkulator saat order dibuat
+  unitPrice    Decimal? @map("unit_price") @db.Decimal(14, 2)
+  lineTotal    Decimal? @map("line_total") @db.Decimal(14, 2)
+  widthCm      Decimal? @map("width_cm") @db.Decimal(10, 2)
+  heightCm     Decimal? @map("height_cm") @db.Decimal(10, 2)
+  materialKey  String?  @map("material_key") // legacy, tidak diisi lagi sejak sistem opsi per-produk - lihat selectedOptions
+  finishingKey String?  @map("finishing_key") // legacy, idem
+  needDesign   Boolean  @default(false) @map("need_design")
+
+  // NEW - snapshot pilihan opsi produk (label, bukan FK, supaya riwayat order tetap stabil
+  // walau opsi diedit/dihapus manager belakangan). Bentuk: [{groupId,groupLabel,choiceId,choiceLabel}]
+  selectedOptions Json?   @map("selected_options")
+  designLink      String? @map("design_link") // link desain eksternal (Drive/Canva/dsb), sejajar fileUrl
+
   productionOrder ProductionOrder  @relation(fields: [poId], references: [poId])
   product         Product          @relation(fields: [productId], references: [productId])
   productionTasks ProductionTask[]
@@ -169,13 +264,18 @@ model SalesPos {
 }
 
 model Payment {
-  paymentId Int      @id @default(autoincrement()) @map("payment_id")
-  saleId    Int      @map("sale_id")
-  method    String
-  amount    Decimal  @db.Decimal(14, 2)
-  paidAt    DateTime @default(now()) @map("paid_at")
+  paymentId   Int       @id @default(autoincrement()) @map("payment_id")
+  saleId      Int       @map("sale_id")
+  method      String
+  amount      Decimal   @db.Decimal(14, 2)
+  status      String    @default("confirmed") // 'confirmed' | 'pending' | 'rejected'
+  proofUrl    String?   @map("proof_url") // bukti transfer yang diupload pelanggan storefront
+  confirmedBy Int?      @map("confirmed_by")
+  confirmedAt DateTime? @map("confirmed_at")
+  paidAt      DateTime  @default(now()) @map("paid_at")
 
-  sale SalesPos @relation(fields: [saleId], references: [saleId])
+  sale            SalesPos @relation(fields: [saleId], references: [saleId])
+  confirmedByUser User?    @relation(fields: [confirmedBy], references: [userId])
 
   @@map("payments")
 }
@@ -315,6 +415,23 @@ model Campaign {
   createdAt  DateTime  @default(now()) @map("created_at")
 
   @@map("campaigns")
+}
+
+// ---------- Storefront: Promo ----------
+
+model Promo {
+  promoId     Int       @id @default(autoincrement()) @map("promo_id")
+  title       String
+  description String?   @db.Text
+  imageUrl    String?   @map("image_url")
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  updatedBy   Int?      @map("updated_by")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("promos")
 }
 
 // ---------- M12: Notification & Approval ----------

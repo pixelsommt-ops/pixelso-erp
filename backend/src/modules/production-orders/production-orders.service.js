@@ -161,4 +161,4 @@ async function update(id, data) {
   });
 }
 
-module.exports = { list, getById, create, update };
+module.exports = { list, getById, create, update, generatePoNumber };

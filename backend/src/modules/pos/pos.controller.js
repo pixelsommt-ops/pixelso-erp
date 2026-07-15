@@ -23,4 +23,9 @@ const update = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update };
+const confirmPayment = asyncHandler(async (req, res) => {
+  const data = await service.confirmPayment(req.params.id, req.params.paymentId, req.body.action, req.user);
+  res.json({ success: true, data });
+});
+
+module.exports = { list, getById, create, update, confirmPayment };
