@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import * as productsService from '../../services/productsService';
 import * as categoryService from '../../services/categoryService';
+import * as pricingModeService from '../../services/pricingModeService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
@@ -9,6 +10,8 @@ import { formatCurrency } from '../../utils/format';
 
 const EMPTY_FORM = { name: '', categoryId: '', unit: '', basePrice: '' };
 const EMPTY_CATEGORY_FORM = { name: '' };
+const EMPTY_MODE_FORM = { key: '', label: '', calcType: 'scalar', unitLabel: '', inputLabel: '', sortOrder: 0 };
+const CALC_TYPE_LABELS = { area: 'Luas (Lebar x Tinggi)', scalar: 'Angka Tunggal (jumlah/durasi/berat, dst)' };
 
 export default function ProductsPage() {
   const { hasRole } = useAuth();
@@ -25,12 +28,21 @@ export default function ProductsPage() {
   const [categoryError, setCategoryError] = useState('');
   const [submittingCategory, setSubmittingCategory] = useState(false);
 
+  const [modalMode, setModalMode] = useState(null);
+  const [modeForm, setModeForm] = useState(EMPTY_MODE_FORM);
+  const [modeError, setModeError] = useState('');
+  const [submittingMode, setSubmittingMode] = useState(false);
+
   const fetchProducts = useCallback(() => productsService.list({ search: search || undefined }), [search]);
   const { data: products, loading, error, reload } = useFetch(fetchProducts, [fetchProducts]);
 
   const fetchCategories = useCallback(() => categoryService.list(), []);
   const { data: categories, loading: loadingCategories, error: categoriesError, reload: reloadCategories } =
     useFetch(fetchCategories, [fetchCategories]);
+
+  const fetchPricingModes = useCallback(() => pricingModeService.list(), []);
+  const { data: pricingModes, loading: loadingModes, error: modesError, reload: reloadModes } =
+    useFetch(fetchPricingModes, [fetchPricingModes]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -124,6 +136,57 @@ export default function ProductsPage() {
     }
   };
 
+  const openCreateMode = () => {
+    setModeForm(EMPTY_MODE_FORM);
+    setModeError('');
+    setModalMode({});
+  };
+
+  const openEditMode = (mode) => {
+    setModeForm({
+      key: mode.key,
+      label: mode.label,
+      calcType: mode.calcType,
+      unitLabel: mode.unitLabel,
+      inputLabel: mode.inputLabel,
+      sortOrder: mode.sortOrder,
+    });
+    setModeError('');
+    setModalMode(mode);
+  };
+
+  const closeModeModal = () => setModalMode(null);
+
+  const handleModeSubmit = async (e) => {
+    e.preventDefault();
+    setModeError('');
+    setSubmittingMode(true);
+    try {
+      const payload = { ...modeForm, sortOrder: Number(modeForm.sortOrder || 0) };
+      if (modalMode?.modeId) {
+        await pricingModeService.update(modalMode.key, payload);
+      } else {
+        await pricingModeService.create(payload);
+      }
+      closeModeModal();
+      reloadModes();
+    } catch (err) {
+      setModeError(err?.response?.data?.message || 'Gagal menyimpan mode harga');
+    } finally {
+      setSubmittingMode(false);
+    }
+  };
+
+  const handleDeleteMode = async (mode) => {
+    if (!window.confirm(`Hapus mode harga "${mode.label}"?`)) return;
+    try {
+      await pricingModeService.deleteMode(mode.key);
+      reloadModes();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'Gagal menghapus mode harga');
+    }
+  };
+
   const categoryColumns = [
     { key: 'name', label: 'Nama Kategori' },
     ...(canManage
@@ -137,6 +200,32 @@ export default function ProductsPage() {
                   Edit
                 </button>
                 <button type="button" className="btn btn-sm" onClick={() => handleDeleteCategory(r)}>
+                  Hapus
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  const modeColumns = [
+    { key: 'key', label: 'Key' },
+    { key: 'label', label: 'Label' },
+    { key: 'calcType', label: 'Tipe Kalkulasi', render: (r) => CALC_TYPE_LABELS[r.calcType] || r.calcType },
+    { key: 'unitLabel', label: 'Satuan' },
+    { key: 'isActive', label: 'Aktif', render: (r) => (r.isActive ? '✓' : '—') },
+    ...(canManage
+      ? [
+          {
+            key: 'actions',
+            label: '',
+            render: (r) => (
+              <div className="btn-group">
+                <button type="button" className="btn btn-sm" onClick={() => openEditMode(r)}>
+                  Edit
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => handleDeleteMode(r)}>
                   Hapus
                 </button>
               </div>
@@ -190,6 +279,27 @@ export default function ProductsPage() {
       />
 
       <div className="page-header" style={{ marginTop: '2rem' }}>
+        <h1>Master Mode Harga</h1>
+        {canManage && (
+          <button type="button" className="btn btn-primary" onClick={openCreateMode}>
+            + Tambah Mode
+          </button>
+        )}
+      </div>
+      <p style={{ margin: '0 0 0.75rem', color: 'var(--text-muted, #666)', fontSize: '0.85rem' }}>
+        Daftar mode kalkulasi harga yang bisa dipilih di halaman Harga Website. Mode "Luas" butuh
+        ukuran Lebar x Tinggi (mis. Per m²); mode "Angka Tunggal" butuh satu angka saja
+        (mis. Per Pcs, Per Menit, Per Gram).
+      </p>
+      <DataTable
+        columns={modeColumns}
+        rows={pricingModes}
+        loading={loadingModes}
+        error={modesError}
+        rowKey="modeId"
+      />
+
+      <div className="page-header" style={{ marginTop: '2rem' }}>
         <h1>Master Produk</h1>
         {canManage && (
           <button type="button" className="btn btn-primary" onClick={openCreate}>
@@ -230,6 +340,87 @@ export default function ProductsPage() {
               </button>
               <button type="submit" className="btn btn-primary" disabled={submittingCategory}>
                 {submittingCategory ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modalMode && (
+        <Modal title={modalMode.modeId ? 'Edit Mode Harga' : 'Tambah Mode Harga'} onClose={closeModeModal}>
+          <form onSubmit={handleModeSubmit}>
+            {modeError && <div className="alert alert-error">{modeError}</div>}
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Key</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="mis. menit"
+                  disabled={Boolean(modalMode.modeId)}
+                  value={modeForm.key}
+                  onChange={(e) => setModeForm({ ...modeForm, key: e.target.value })}
+                />
+                {modalMode.modeId && (
+                  <small style={{ color: 'var(--text-muted, #666)' }}>Key tidak bisa diubah setelah dibuat.</small>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Label</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="mis. Per Menit"
+                  value={modeForm.label}
+                  onChange={(e) => setModeForm({ ...modeForm, label: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Tipe Kalkulasi</label>
+                <select
+                  value={modeForm.calcType}
+                  onChange={(e) => setModeForm({ ...modeForm, calcType: e.target.value })}
+                >
+                  {Object.entries(CALC_TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Satuan (tampilan singkat)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="mis. menit"
+                  value={modeForm.unitLabel}
+                  onChange={(e) => setModeForm({ ...modeForm, unitLabel: e.target.value })}
+                />
+              </div>
+              <div className="form-group full">
+                <label>Label Input di Form Order Storefront</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="mis. Durasi (menit)"
+                  value={modeForm.inputLabel}
+                  onChange={(e) => setModeForm({ ...modeForm, inputLabel: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Urutan Tampil</label>
+                <input
+                  type="number"
+                  value={modeForm.sortOrder}
+                  onChange={(e) => setModeForm({ ...modeForm, sortOrder: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="btn-group" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={closeModeModal}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={submittingMode}>
+                {submittingMode ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </form>

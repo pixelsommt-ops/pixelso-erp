@@ -194,6 +194,23 @@ model Category {
   @@map("categories")
 }
 
+// Master Mode Harga - daftar mode kalkulasi harga yang bisa dipilih staf saat bikin PrintProduct
+// (mis. "Per m²", "Per Pcs", "Per Menit", "Per Gram"). Lookup/metadata saja - PrintProduct.pricingMode
+// tetap String biasa (bukan FK) supaya tidak perlu migrasi data & kontrak string yang sudah dipakai
+// calculator/API publik tidak berubah. Lihat pricing.service.js untuk validasi & enrichment.
+model PricingMode {
+  modeId     Int      @id @default(autoincrement()) @map("mode_id")
+  key        String   @unique // slug, immutable setelah dibuat (direferensikan sebagai string oleh PrintProduct.pricingMode)
+  label      String // "Per m²", "Per Pcs", "Per Menit", "Per Gram" - ditampilkan di dropdown & tabel
+  calcType   String   @default("scalar") @map("calc_type") // 'area' (butuh lebar x tinggi) | 'scalar' (satu angka: pcs/menit/gram/dst)
+  unitLabel  String   @map("unit_label") // "m²", "pcs", "menit", "gram" - suffix singkat buat tampilan storefront
+  inputLabel String   @map("input_label") // label field form storefront, mis. "Durasi (menit)", "Berat (gram)"
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+
+  @@map("pricing_modes")
+}
+
 model ProductionOrder {
   poId       Int      @id @default(autoincrement()) @map("po_id")
   poNumber   String   @unique @map("po_number")

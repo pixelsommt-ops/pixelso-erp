@@ -28,6 +28,7 @@ const storefrontRoutes = require('./modules/storefront/storefront.routes');
 const settingsRoutes = require('./modules/settings/settings.routes');
 const promoRoutes = require('./modules/promo/promo.routes');
 const categoryRoutes = require('./modules/category/category.routes');
+const pricingModeRoutes = require('./modules/pricingMode/pricingMode.routes');
 
 const app = express();
 
@@ -90,6 +91,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/promos', promoRoutes);
 // Master Kategori - dipakai bareng Master Produk (internal) dan katalog storefront (Pricing)
 app.use('/api/categories', categoryRoutes);
+// Master Mode Harga - dipakai dropdown "Mode Harga" di Pricing, dikelola dari Master Produk
+app.use('/api/pricing-modes', pricingModeRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

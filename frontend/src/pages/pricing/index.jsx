@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import * as pricingService from '../../services/pricingService';
 import * as categoryService from '../../services/categoryService';
+import * as pricingModeService from '../../services/pricingModeService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
@@ -277,6 +278,11 @@ export default function PricingPage() {
   const fetchCategories = useCallback(() => categoryService.list(), []);
   const { data: categories } = useFetch(fetchCategories, [fetchCategories]);
 
+  const fetchPricingModes = useCallback(() => pricingModeService.list(), []);
+  const { data: pricingModes } = useFetch(fetchPricingModes, [fetchPricingModes]);
+  const modeLabelByKey = new Map((pricingModes || []).map((m) => [m.key, m.label]));
+  const modeCalcTypeByKey = new Map((pricingModes || []).map((m) => [m.key, m.calcType]));
+
   const [settingsForm, setSettingsForm] = useState(null);
   const [settingsError, setSettingsError] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
@@ -441,7 +447,7 @@ export default function PricingPage() {
     { key: 'isActive', label: 'Aktif', render: (r) => (r.isActive ? '✓' : '—') },
     { key: 'key', label: 'Kode' },
     { key: 'name', label: 'Nama Produk' },
-    { key: 'pricingMode', label: 'Mode', render: (r) => (r.pricingMode === 'area' ? 'Per m²' : 'Per pcs') },
+    { key: 'pricingMode', label: 'Mode', render: (r) => modeLabelByKey.get(r.pricingMode) || r.pricingMode },
     { key: 'category', label: 'Kategori', render: (r) => r.category?.name || '-' },
     { key: 'baseRate', label: 'Tarif Dasar', render: (r) => formatCurrency(r.baseRate) },
     { key: 'minimumArea', label: 'Minimum Area', render: (r) => r.minimumArea },
@@ -534,7 +540,7 @@ export default function PricingPage() {
         <div className="card-head">
           <div>
             <h3>Daftar Produk Website</h3>
-            <p>Mode "Per m²" memakai ukuran cm dan tarif per m². Mode "Per pcs" memakai tarif per pcs.</p>
+            <p>Mode area (mis. "Per m²") memakai ukuran Lebar x Tinggi. Mode lain (Per Pcs, Per Menit, dst) memakai satu angka. Kelola daftar mode di Master Produk.</p>
           </div>
           <button type="button" className="btn btn-primary" onClick={openCreateProduct}>
             + Tambah Produk
@@ -577,8 +583,11 @@ export default function PricingPage() {
                   value={productForm.pricingMode}
                   onChange={(e) => setProductForm({ ...productForm, pricingMode: e.target.value })}
                 >
-                  <option value="area">Per m² (area)</option>
-                  <option value="unit">Per pcs (unit)</option>
+                  {(pricingModes || [])
+                    .filter((m) => m.isActive || m.key === productForm.pricingMode)
+                    .map((m) => (
+                      <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
                 </select>
               </div>
               <div className="form-group">
@@ -613,16 +622,18 @@ export default function PricingPage() {
                   onChange={(e) => setProductForm({ ...productForm, baseRate: e.target.value })}
                 />
               </div>
-              <div className="form-group">
-                <label>Minimum Area (m²)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={productForm.minimumArea}
-                  onChange={(e) => setProductForm({ ...productForm, minimumArea: e.target.value })}
-                />
-              </div>
+              {modeCalcTypeByKey.get(productForm.pricingMode) === 'area' && (
+                <div className="form-group">
+                  <label>Minimum Area (m²)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={productForm.minimumArea}
+                    onChange={(e) => setProductForm({ ...productForm, minimumArea: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="form-group">
                 <label>Biaya Setup (Rp)</label>
                 <input

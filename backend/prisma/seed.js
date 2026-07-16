@@ -73,6 +73,17 @@ async function main() {
   }
   console.log('Seed kategori done.');
 
+  // Master Mode Harga - dua mode yang sudah ada sejak awal (area/unit), sisanya (menit/gram/dst)
+  // ditambah staf sendiri lewat halaman /products - lihat modul pricingMode.
+  const PRICING_MODES = [
+    { key: 'area', label: 'Per m² (Luas)', calcType: 'area', unitLabel: 'm²', inputLabel: 'Ukuran (Lebar x Tinggi)', sortOrder: 0 },
+    { key: 'unit', label: 'Per Pcs', calcType: 'scalar', unitLabel: 'pcs', inputLabel: 'Jumlah (pcs)', sortOrder: 1 },
+  ];
+  for (const mode of PRICING_MODES) {
+    await prisma.pricingMode.upsert({ where: { key: mode.key }, update: {}, create: mode });
+  }
+  console.log('Seed mode harga done.');
+
   const PRINT_PRODUCTS = [
     { key: 'banner', name: 'Banner / MMT Outdoor', pricingMode: 'area', categoryName: 'Banner & Spanduk', baseRate: 28000, minimumArea: 0.5, setupFee: 0 },
     { key: 'sticker', name: 'Stiker Indoor', pricingMode: 'area', categoryName: 'Stiker', baseRate: 85000, minimumArea: 0.25, setupFee: 0 },

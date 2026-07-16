@@ -6,7 +6,6 @@ const { PO_STATUS } = require('../../common/constants');
 const { sanitizeDescriptionHtml } = require('../../common/utils/htmlSanitize');
 
 const SETTINGS_ID = 1;
-const VALID_MODES = ['area', 'unit'];
 const KEY_PATTERN = /^[a-z0-9_-]+$/;
 const MAX_PRODUCT_IMAGES = 4;
 const VALID_PRICE_MODES = ['replace_base', 'multiplier', 'add'];
@@ -93,6 +92,15 @@ function normalizeVideoUrl(videoUrl) {
   return videoUrl;
 }
 
+// Mode harga (area/unit/menit/gram/dst) sekarang data, bukan array hardcode - dikelola lewat
+// modul pricingMode (Master Mode Harga, halaman /products). Harus ada & aktif.
+async function validatePricingMode(pricingMode) {
+  const mode = await prisma.pricingMode.findUnique({ where: { key: pricingMode } });
+  if (!mode || !mode.isActive) {
+    throw new ApiError(400, 'Mode harga tidak valid atau tidak aktif - kelola di Master Mode (/products)');
+  }
+}
+
 async function getSettings() {
   const row = await prisma.pricingSetting.findUnique({ where: { id: SETTINGS_ID } });
   return row || { id: SETTINGS_ID, designFee: 0, materialFactors: {}, finishingRates: {} };
@@ -140,9 +148,7 @@ async function createProduct(data, userId) {
   if (!name) {
     throw new ApiError(400, 'name is required');
   }
-  if (!VALID_MODES.includes(pricingMode)) {
-    throw new ApiError(400, "pricingMode must be 'area' or 'unit'");
-  }
+  await validatePricingMode(pricingMode);
 
   const normalizedImages = normalizeImages(images) || [];
   const normalizedOptionGroups = normalizeOptionGroups(optionGroups) || [];
@@ -177,8 +183,8 @@ async function updateProduct(key, data, userId) {
   if (data.key !== undefined && data.key !== key) {
     throw new ApiError(400, 'key cannot be changed once created (the landing page references products by key)');
   }
-  if (data.pricingMode !== undefined && !VALID_MODES.includes(data.pricingMode)) {
-    throw new ApiError(400, "pricingMode must be 'area' or 'unit'");
+  if (data.pricingMode !== undefined) {
+    await validatePricingMode(data.pricingMode);
   }
 
   const { name, pricingMode, categoryId, baseRate, minimumArea, setupFee, isActive, sortOrder, images, videoUrl, description, specs, optionGroups } = data;
@@ -242,20 +248,29 @@ async function getSoldCountByPrintProductId() {
 
 // Reshapes DB rows into the exact JSON contract the landing page & storefront expect as `config.pricing`.
 async function getPublicPricing() {
-  const [settings, products, soldByPrintProductId] = await Promise.all([
+  const [settings, products, soldByPrintProductId, pricingModes] = await Promise.all([
     getSettings(),
     listProducts(),
     getSoldCountByPrintProductId(),
+    prisma.pricingMode.findMany(),
   ]);
+  const modeByKey = new Map(pricingModes.map((m) => [m.key, m]));
 
   return {
     designFee: Number(settings.designFee || 0),
     materialFactors: settings.materialFactors || {},
     finishingRates: settings.finishingRates || {},
-    products: products.map((p) => ({
+    products: products.map((p) => {
+      // Fallback kalau mode-nya sudah dihapus/tidak ketemu (harusnya tidak terjadi - deleteMode
+      // dijaga selama masih dipakai produk) - tetap jalan seperti perilaku lama (scalar/pcs).
+      const modeInfo = modeByKey.get(p.pricingMode) || { calcType: 'scalar', unitLabel: 'pcs', inputLabel: 'Jumlah (pcs)' };
+      return {
       key: p.key,
       name: p.name,
       mode: p.pricingMode,
+      calcType: modeInfo.calcType,
+      unitLabel: modeInfo.unitLabel,
+      inputLabel: modeInfo.inputLabel,
       category: p.category?.name || null,
       baseRate: Number(p.baseRate),
       minArea: Number(p.minimumArea),
@@ -281,7 +296,8 @@ async function getPublicPricing() {
           qtyTiers: Array.isArray(c.qtyTiers) ? c.qtyTiers : null,
         })),
       })),
-    })),
+      };
+    }),
   };
 }
 
