@@ -59,6 +59,7 @@ model User {
 
 model Customer {
   customerId Int      @id @default(autoincrement()) @map("customer_id")
+  legacyId   String?  @unique @map("legacy_id") // idpelanggan dari POS lama (mis. 'PL00001') - cuma diisi hasil migrasi, lihat migrate-legacy-data.js
   name       String
   phone      String?
   email      String?  @unique // NEW, nullable - row lama (walk-in, dibuat staf) tetap valid tanpa email
@@ -76,9 +77,13 @@ model Customer {
 
 model Product {
   productId      Int           @id @default(autoincrement()) @map("product_id")
+  legacyId       String?       @unique @map("legacy_id") // idproduk dari POS lama (mis. 'PR00001') - cuma diisi hasil migrasi, lihat migrate-legacy-data.js
   name           String
   categoryId     Int?          @map("category_id")
-  basePrice      Decimal       @default(0) @map("base_price") @db.Decimal(14, 2)
+  basePrice      Decimal       @default(0) @map("base_price") @db.Decimal(14, 2) // Harga Retail
+  priceGrosir1   Decimal?      @map("price_grosir1") @db.Decimal(14, 2)
+  priceGrosir23  Decimal?      @map("price_grosir23") @db.Decimal(14, 2) // gabungan tingkat Grosir 2 & 3
+  priceHpp       Decimal?      @map("price_hpp") @db.Decimal(14, 2) // harga pokok/modal
   unit           String?
   printProductId Int?          @unique @map("print_product_id") // NEW - link ke katalog storefront (PrintProduct)
 
@@ -192,6 +197,21 @@ model Category {
   printProducts PrintProduct[]
 
   @@map("categories")
+}
+
+// Master Supplier - dari migrasi data POS lama (migrate-legacy-data.js). Belum ada relasi ke
+// Material/Product (mis. "produk ini dari supplier X") - itu fitur pembelian terpisah, di luar
+// cakupan migrasi data ini, cuma tempat menyimpan datanya dulu.
+model Supplier {
+  supplierId Int      @id @default(autoincrement()) @map("supplier_id")
+  legacyId   String?  @unique @map("legacy_id") // idsupplier dari POS lama (mis. 'SU001')
+  name       String
+  address    String?
+  phone      String?
+  contact    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("suppliers")
 }
 
 // Master Mode Harga - daftar mode kalkulasi harga yang bisa dipilih staf saat bikin PrintProduct

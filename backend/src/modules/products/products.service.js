@@ -23,7 +23,7 @@ async function getById(id) {
 }
 
 async function create(data) {
-  const { name, categoryId, basePrice, unit } = data;
+  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit } = data;
 
   if (!name) {
     throw new ApiError(400, 'name is required');
@@ -35,12 +35,15 @@ async function create(data) {
       categoryId: categoryId ? Number(categoryId) : null,
       unit,
       basePrice: basePrice !== undefined ? Number(basePrice) : undefined,
+      priceGrosir1: priceGrosir1 !== undefined && priceGrosir1 !== null ? Number(priceGrosir1) : null,
+      priceGrosir23: priceGrosir23 !== undefined && priceGrosir23 !== null ? Number(priceGrosir23) : null,
+      priceHpp: priceHpp !== undefined && priceHpp !== null ? Number(priceHpp) : null,
     },
   });
 }
 
 async function update(id, data) {
-  const { name, categoryId, basePrice, unit } = data;
+  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit } = data;
 
   const product = await prisma.product.findUnique({ where: { productId: Number(id) } });
   if (!product) {
@@ -54,6 +57,9 @@ async function update(id, data) {
       ...(categoryId !== undefined ? { categoryId: categoryId ? Number(categoryId) : null } : {}),
       ...(unit !== undefined ? { unit } : {}),
       ...(basePrice !== undefined ? { basePrice: Number(basePrice) } : {}),
+      ...(priceGrosir1 !== undefined ? { priceGrosir1: priceGrosir1 !== null ? Number(priceGrosir1) : null } : {}),
+      ...(priceGrosir23 !== undefined ? { priceGrosir23: priceGrosir23 !== null ? Number(priceGrosir23) : null } : {}),
+      ...(priceHpp !== undefined ? { priceHpp: priceHpp !== null ? Number(priceHpp) : null } : {}),
     },
   });
 }

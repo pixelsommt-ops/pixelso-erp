@@ -8,7 +8,7 @@ import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { formatCurrency } from '../../utils/format';
 
-const EMPTY_FORM = { name: '', categoryId: '', unit: '', basePrice: '' };
+const EMPTY_FORM = { name: '', categoryId: '', unit: '', basePrice: '', priceGrosir1: '', priceGrosir23: '', priceHpp: '' };
 const EMPTY_CATEGORY_FORM = { name: '' };
 const EMPTY_MODE_FORM = { key: '', label: '', calcType: 'scalar', unitLabel: '', inputLabel: '', sortOrder: 0 };
 const CALC_TYPE_LABELS = { area: 'Luas (Lebar x Tinggi)', scalar: 'Angka Tunggal (jumlah/durasi/berat, dst)' };
@@ -56,6 +56,9 @@ export default function ProductsPage() {
       categoryId: product.categoryId || '',
       unit: product.unit || '',
       basePrice: product.basePrice,
+      priceGrosir1: product.priceGrosir1 ?? '',
+      priceGrosir23: product.priceGrosir23 ?? '',
+      priceHpp: product.priceHpp ?? '',
     });
     setFormError('');
     setModalProduct(product);
@@ -68,7 +71,13 @@ export default function ProductsPage() {
     setFormError('');
     setSubmitting(true);
     try {
-      const payload = { ...form, basePrice: Number(form.basePrice) };
+      const payload = {
+        ...form,
+        basePrice: Number(form.basePrice),
+        priceGrosir1: form.priceGrosir1 === '' ? null : Number(form.priceGrosir1),
+        priceGrosir23: form.priceGrosir23 === '' ? null : Number(form.priceGrosir23),
+        priceHpp: form.priceHpp === '' ? null : Number(form.priceHpp),
+      };
       if (modalProduct?.productId) {
         await productsService.update(modalProduct.productId, payload);
       } else {
@@ -239,7 +248,7 @@ export default function ProductsPage() {
     { key: 'name', label: 'Nama Produk' },
     { key: 'category', label: 'Kategori', render: (r) => r.category?.name || '-' },
     { key: 'unit', label: 'Satuan', render: (r) => r.unit || '-' },
-    { key: 'basePrice', label: 'Harga Dasar', render: (r) => formatCurrency(r.basePrice) },
+    { key: 'basePrice', label: 'Harga Retail', render: (r) => formatCurrency(r.basePrice) },
     ...(canManage
       ? [
           {
@@ -461,14 +470,41 @@ export default function ProductsPage() {
                   onChange={(e) => setForm({ ...form, unit: e.target.value })}
                 />
               </div>
-              <div className="form-group full">
-                <label>Harga Dasar</label>
+              <div className="form-group">
+                <label>Harga Retail</label>
                 <input
                   type="number"
                   min="0"
                   required
                   value={form.basePrice}
                   onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Grosir 1</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.priceGrosir1}
+                  onChange={(e) => setForm({ ...form, priceGrosir1: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Grosir 2/3</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.priceGrosir23}
+                  onChange={(e) => setForm({ ...form, priceGrosir23: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>HPP (Harga Pokok)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.priceHpp}
+                  onChange={(e) => setForm({ ...form, priceHpp: e.target.value })}
                 />
               </div>
             </div>
