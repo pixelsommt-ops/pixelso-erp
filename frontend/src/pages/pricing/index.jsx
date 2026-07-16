@@ -11,7 +11,8 @@ import { compressImage } from '../../utils/compressImage';
 
 const MAX_PRODUCT_IMAGES = 4;
 const PRICE_MODE_LABELS = { replace_base: 'Ganti Harga Dasar', multiplier: 'Kali Faktor', add: 'Tambahan Rp' };
-const EMPTY_CHOICE = { label: '', priceMode: 'add', priceValue: 0, perUnit: false, isDefault: false };
+const EMPTY_CHOICE = { label: '', priceMode: 'add', priceValue: 0, perUnit: false, isDefault: false, qtyTiers: [] };
+const EMPTY_TIER = { minQty: 1, maxQty: '', price: 0 };
 
 const EMPTY_PRODUCT_FORM = {
   key: '',
@@ -62,6 +63,49 @@ function SpecsEditor({ rows, onChange }) {
   );
 }
 
+// Editor tier harga bertingkat per qty untuk satu pilihan (mis. Stiker HVS 1-100=9000,
+// 101-200=8850, dst) - opsional, kosong berarti pilihan pakai priceValue flat seperti biasa.
+function QtyTiersEditor({ tiers, onChange }) {
+  const updateTier = (index, patch) => {
+    onChange(tiers.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  };
+  const removeTier = (index) => onChange(tiers.filter((_, i) => i !== index));
+  const addTier = () => onChange([...tiers, { ...EMPTY_TIER }]);
+
+  return (
+    <div style={{ width: '100%', marginTop: '0.35rem', paddingLeft: '0.6rem', borderLeft: '2px solid var(--border, #ddd)' }}>
+      {tiers.map((tier, index) => (
+        <div key={index} className="btn-group" style={{ marginBottom: '0.3rem', flexWrap: 'wrap' }}>
+          <input
+            type="number"
+            placeholder="Qty dari"
+            value={tier.minQty}
+            onChange={(e) => updateTier(index, { minQty: Number(e.target.value) })}
+            style={{ maxWidth: 90 }}
+          />
+          <input
+            type="number"
+            placeholder="Qty s/d (kosong = ke atas)"
+            value={tier.maxQty === null || tier.maxQty === undefined ? '' : tier.maxQty}
+            onChange={(e) => updateTier(index, { maxQty: e.target.value === '' ? '' : Number(e.target.value) })}
+            style={{ maxWidth: 170 }}
+          />
+          <input
+            type="number"
+            step="0.01"
+            placeholder="Harga di tier ini"
+            value={tier.price}
+            onChange={(e) => updateTier(index, { price: Number(e.target.value) })}
+            style={{ maxWidth: 130 }}
+          />
+          <button type="button" className="btn btn-sm" onClick={() => removeTier(index)}>Hapus tier</button>
+        </div>
+      ))}
+      <button type="button" className="btn btn-sm" onClick={addTier}>+ Tambah tier qty</button>
+    </div>
+  );
+}
+
 // Editor grup opsi Form Order per produk (mis. Bahan, Laminasi, Finishing) - tiap grup punya
 // beberapa pilihan, tiap pilihan bisa ganti harga dasar / kali faktor / tambah Rp flat.
 // State lokal murni, di-onChange ke productForm.optionGroups, dikirim sekali saat submit
@@ -95,6 +139,15 @@ function OptionGroupsEditor({ groups, onChange }) {
   };
   const addChoice = (groupIndex) => {
     updateGroup(groupIndex, { choices: [...groups[groupIndex].choices, { ...EMPTY_CHOICE }] });
+  };
+  // priceValue tetap disinkronkan ke harga tier dengan minQty terkecil - dipakai tampilan
+  // katalog "mulai dari Rp X" yang baca priceValue, supaya tetap akurat tanpa field terpisah.
+  const updateChoiceTiers = (groupIndex, choiceIndex, tiers) => {
+    const lowest = tiers.length > 0 ? tiers.reduce((min, t) => (Number(t.minQty) < Number(min.minQty) ? t : min)) : null;
+    updateChoice(groupIndex, choiceIndex, {
+      qtyTiers: tiers,
+      ...(lowest ? { priceValue: Number(lowest.price) || 0 } : {}),
+    });
   };
   const moveChoice = (groupIndex, choiceIndex, dir) => {
     const choices = groups[groupIndex].choices;
@@ -137,7 +190,8 @@ function OptionGroupsEditor({ groups, onChange }) {
           </div>
 
           {group.choices.map((choice, choiceIndex) => (
-            <div key={choiceIndex} className="btn-group" style={{ marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+            <div key={choiceIndex} style={{ marginBottom: '0.4rem' }}>
+            <div className="btn-group" style={{ flexWrap: 'wrap' }}>
               <input
                 type="text"
                 placeholder="Nama pilihan"
@@ -157,7 +211,9 @@ function OptionGroupsEditor({ groups, onChange }) {
                 type="number"
                 step="0.01"
                 placeholder="Nilai"
+                title={choice.qtyTiers?.length > 0 ? 'Otomatis mengikuti tier qty dengan qty terendah' : undefined}
                 value={choice.priceValue}
+                disabled={choice.qtyTiers?.length > 0}
                 onChange={(e) => updateChoice(groupIndex, choiceIndex, { priceValue: Number(e.target.value) })}
                 style={{ maxWidth: 110 }}
               />
@@ -185,6 +241,22 @@ function OptionGroupsEditor({ groups, onChange }) {
               <button type="button" className="btn btn-sm" onClick={() => moveChoice(groupIndex, choiceIndex, -1)} disabled={choiceIndex === 0}>↑</button>
               <button type="button" className="btn btn-sm" onClick={() => moveChoice(groupIndex, choiceIndex, 1)} disabled={choiceIndex === group.choices.length - 1}>↓</button>
               <button type="button" className="btn btn-sm" onClick={() => removeChoice(groupIndex, choiceIndex)}>Hapus</button>
+            </div>
+            {choice.qtyTiers?.length > 0 ? (
+              <QtyTiersEditor
+                tiers={choice.qtyTiers}
+                onChange={(tiers) => updateChoiceTiers(groupIndex, choiceIndex, tiers)}
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginTop: '0.3rem' }}
+                onClick={() => updateChoiceTiers(groupIndex, choiceIndex, [{ ...EMPTY_TIER, price: Number(choice.priceValue) || 0 }])}
+              >
+                + Tier qty (harga beda per jumlah pesanan)
+              </button>
+            )}
             </div>
           ))}
           <button type="button" className="btn btn-sm" onClick={() => addChoice(groupIndex)}>+ Tambah pilihan</button>
@@ -271,6 +343,7 @@ export default function PricingPage() {
               priceValue: c.priceValue,
               perUnit: c.perUnit,
               isDefault: c.isDefault,
+              qtyTiers: Array.isArray(c.qtyTiers) ? c.qtyTiers : [],
             })),
           }))
         : [],

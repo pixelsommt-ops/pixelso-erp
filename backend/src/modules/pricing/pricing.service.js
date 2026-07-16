@@ -13,6 +13,29 @@ const VALID_PRICE_MODES = ['replace_base', 'multiplier', 'add'];
 
 const OPTION_GROUPS_INCLUDE = { optionGroups: { include: { choices: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } };
 
+// Tier harga bertingkat opsional per pilihan (mis. Stiker HVS 1-100=9000, 101-200=8850) -
+// null/array kosong berarti pilihan pakai priceValue flat seperti biasa (lihat calculatePrintPrice).
+function normalizeQtyTiers(qtyTiers) {
+  if (qtyTiers === undefined || qtyTiers === null) return null;
+  if (!Array.isArray(qtyTiers) || qtyTiers.length === 0) return null;
+
+  return qtyTiers.map((tier) => {
+    const minQty = Number(tier?.minQty);
+    const price = Number(tier?.price);
+    const maxQty = tier?.maxQty === null || tier?.maxQty === undefined || tier?.maxQty === '' ? null : Number(tier.maxQty);
+    if (!Number.isInteger(minQty) || minQty < 1) {
+      throw new ApiError(400, 'Tier qty: minQty wajib bilangan bulat >= 1');
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      throw new ApiError(400, 'Tier qty: price wajib angka >= 0');
+    }
+    if (maxQty !== null && (!Number.isInteger(maxQty) || maxQty < minQty)) {
+      throw new ApiError(400, 'Tier qty: maxQty wajib kosong (ke atas) atau bilangan bulat >= minQty');
+    }
+    return { minQty, maxQty, price };
+  });
+}
+
 // optionGroups dikirim client sebagai pohon lengkap tiap kali produk disimpan (pola sama
 // dengan images/specs) - divalidasi lalu dipakai untuk replace-seluruh-pohon di create/update.
 function normalizeOptionGroups(optionGroups) {
@@ -43,6 +66,7 @@ function normalizeOptionGroups(optionGroups) {
             perUnit: Boolean(choice.perUnit),
             isDefault: Boolean(choice.isDefault),
             sortOrder: choiceIndex,
+            qtyTiers: normalizeQtyTiers(choice.qtyTiers),
           };
         }),
       },
@@ -254,6 +278,7 @@ async function getPublicPricing() {
           priceValue: Number(c.priceValue),
           perUnit: c.perUnit,
           isDefault: c.isDefault,
+          qtyTiers: Array.isArray(c.qtyTiers) ? c.qtyTiers : null,
         })),
       })),
     })),

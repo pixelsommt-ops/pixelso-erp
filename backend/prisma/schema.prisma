@@ -176,6 +176,7 @@ model ProductOptionChoice {
   perUnit    Boolean  @default(false) @map("per_unit") // priceMode 'add': kali qty atau flat sekali
   isDefault  Boolean  @default(false) @map("is_default")
   sortOrder  Int      @default(0) @map("sort_order")
+  qtyTiers   Json?    @map("qty_tiers") // opsional: [{minQty, maxQty|null, price}] naik per minQty - kalau null/kosong pakai priceValue flat seperti biasa, lihat calculatePrintPrice
 
   group ProductOptionGroup @relation(fields: [groupId], references: [groupId], onDelete: Cascade)
 

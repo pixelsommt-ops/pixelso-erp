@@ -70,4 +70,64 @@ describe('Pricing (harga kalkulator website)', () => {
     const testBanner = res.body.data.products.find((p) => p.key === 'test-banner');
     expect(testBanner).toMatchObject({ key: 'test-banner', mode: 'area', baseRate: 10000 });
   });
+
+  test('manager can create a choice with qty tiers, and it round-trips on read', async () => {
+    const createRes = await request(app)
+      .post('/api/pricing/products')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        key: 'test-tiered',
+        name: 'Test Tiered Product',
+        pricingMode: 'unit',
+        baseRate: 9000,
+        optionGroups: [
+          {
+            label: 'Bahan',
+            required: true,
+            choices: [
+              {
+                label: 'Stiker HVS',
+                priceMode: 'replace_base',
+                priceValue: 9000,
+                isDefault: true,
+                qtyTiers: [
+                  { minQty: 1, maxQty: 100, price: 9000 },
+                  { minQty: 101, maxQty: null, price: 8850 },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    expect(createRes.status).toBe(201);
+
+    const getRes = await request(app)
+      .get('/api/pricing/products/test-tiered')
+      .set('Authorization', `Bearer ${managerToken}`);
+    expect(getRes.status).toBe(200);
+    const choice = getRes.body.data.optionGroups[0].choices[0];
+    expect(choice.qtyTiers).toEqual([
+      { minQty: 1, maxQty: 100, price: 9000 },
+      { minQty: 101, maxQty: null, price: 8850 },
+    ]);
+  });
+
+  test('qty tier with maxQty below minQty is rejected (400)', async () => {
+    const res = await request(app)
+      .post('/api/pricing/products')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        key: 'test-bad-tier',
+        name: 'Test Bad Tier',
+        pricingMode: 'unit',
+        baseRate: 1000,
+        optionGroups: [
+          {
+            label: 'Bahan',
+            choices: [{ label: 'X', priceMode: 'replace_base', priceValue: 1000, qtyTiers: [{ minQty: 100, maxQty: 1, price: 500 }] }],
+          },
+        ],
+      });
+    expect(res.status).toBe(400);
+  });
 });

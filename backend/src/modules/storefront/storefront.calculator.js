@@ -8,6 +8,15 @@ function number(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Resolusi harga tier-qty opsional per pilihan (mis. Stiker HVS 1-100=9000, 101-200=8850, dst,
+// beda tier per bahan/pilihan) - tanpa qtyTiers, perilaku sama seperti sebelumnya (priceValue flat).
+function resolveTierPrice(choice, quantity) {
+  if (!Array.isArray(choice.qtyTiers) || choice.qtyTiers.length === 0) return number(choice.priceValue);
+  const sorted = [...choice.qtyTiers].sort((a, b) => number(a.minQty) - number(b.minQty));
+  const match = sorted.find((t) => quantity >= number(t.minQty) && (t.maxQty == null || quantity <= number(t.maxQty)));
+  return Math.max(0, number((match || sorted[sorted.length - 1]).price));
+}
+
 // config: { designFee, products } - products[].optionGroups dari pricing.service.js#getPublicPricing()
 // input.selections: { [groupId]: choiceId } - satu pilihan per grup opsi produk.
 function calculatePrintPrice(config, input) {
@@ -37,7 +46,7 @@ function calculatePrintPrice(config, input) {
 
   let effectiveBaseRate = Math.max(0, number(product.baseRate));
   const replaceChoice = selectedChoicesByGroup.find((c) => c.priceMode === 'replace_base');
-  if (replaceChoice) effectiveBaseRate = Math.max(0, number(replaceChoice.priceValue));
+  if (replaceChoice) effectiveBaseRate = Math.max(0, resolveTierPrice(replaceChoice, quantity));
 
   let base = 0;
   let billedArea = 0;
@@ -52,9 +61,9 @@ function calculatePrintPrice(config, input) {
   let optionAdd = 0;
   for (const choice of selectedChoicesByGroup) {
     if (choice.priceMode === 'multiplier') {
-      base *= Math.max(0, number(choice.priceValue));
+      base *= Math.max(0, resolveTierPrice(choice, quantity));
     } else if (choice.priceMode === 'add') {
-      const value = Math.max(0, number(choice.priceValue));
+      const value = Math.max(0, resolveTierPrice(choice, quantity));
       optionAdd += choice.perUnit ? value * quantity : value;
     }
   }
