@@ -45,7 +45,7 @@ describe('POS & Payments', () => {
 
   test('payment exceeding remaining balance is rejected', async () => {
     const listRes = await request(app).get('/api/pos').set('Authorization', `Bearer ${cashierToken}`);
-    const sale = listRes.body.data.find((s) => s.poId === approvedPoId);
+    const sale = listRes.body.data.sales.find((s) => s.poId === approvedPoId);
 
     const res = await request(app)
       .put(`/api/pos/${sale.saleId}`)
@@ -56,7 +56,7 @@ describe('POS & Payments', () => {
 
   test('paying the exact remaining balance completes the invoice', async () => {
     const listRes = await request(app).get('/api/pos').set('Authorization', `Bearer ${cashierToken}`);
-    const sale = listRes.body.data.find((s) => s.poId === approvedPoId);
+    const sale = listRes.body.data.sales.find((s) => s.poId === approvedPoId);
 
     const res = await request(app)
       .put(`/api/pos/${sale.saleId}`)

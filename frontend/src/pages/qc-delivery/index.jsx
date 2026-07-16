@@ -202,8 +202,8 @@ function DeliveryTab() {
   const openCreate = async () => {
     setForm(EMPTY_DELIVERY_FORM);
     setFormError('');
-    const res = await productionOrdersService.list({ status: 'ready' });
-    setReadyOrders(res.data);
+    const res = await productionOrdersService.list({ status: 'ready', pageSize: 200 });
+    setReadyOrders(res.data.orders);
     setCreateOpen(true);
   };
   const closeCreate = () => setCreateOpen(false);

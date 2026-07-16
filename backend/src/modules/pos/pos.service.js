@@ -24,16 +24,38 @@ function paidStatusFor(total, paidSoFar) {
   return 'partial';
 }
 
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
 async function list(query) {
-  const { paidStatus, poId, cashierId } = query;
+  const { paidStatus, poId, cashierId, dateFrom, dateTo, page, pageSize } = query;
 
   const where = {
     ...(paidStatus ? { paidStatus } : {}),
     ...(poId ? { poId: Number(poId) } : {}),
     ...(cashierId ? { cashierId: Number(cashierId) } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          createdAt: {
+            ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00`) } : {}),
+            ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999`) } : {}),
+          },
+        }
+      : {}),
   };
 
-  return prisma.salesPos.findMany({ where, include: DETAIL_INCLUDE, orderBy: { createdAt: 'desc' } });
+  // Wajib dipaginasi - tabel ini sekarang berisi puluhan ribu baris histori migrasi POS lama
+  // (lihat migrate-legacy-sales.js), findMany tanpa batas bikin tab browser staf freeze.
+  const take = Math.min(Number(pageSize) || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const currentPage = Math.max(Number(page) || 1, 1);
+  const skip = (currentPage - 1) * take;
+
+  const [sales, total] = await Promise.all([
+    prisma.salesPos.findMany({ where, include: DETAIL_INCLUDE, orderBy: { createdAt: 'desc' }, take, skip }),
+    prisma.salesPos.count({ where }),
+  ]);
+
+  return { sales, total, page: currentPage, pageSize: take, totalPages: Math.max(1, Math.ceil(total / take)) };
 }
 
 async function getById(id) {

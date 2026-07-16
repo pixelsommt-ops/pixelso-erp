@@ -34,7 +34,8 @@ export default function InventoryPage() {
   const { data: materials, loading, error, reload } = useFetch(fetchMaterials, [fetchMaterials]);
 
   useEffect(() => {
-    productionOrdersService.list().then((res) => setOrders(res.data));
+    // pageSize dibatasi - daftar ini cuma buat dropdown "reserve ke PO", tidak perlu semua histori.
+    productionOrdersService.list({ pageSize: 200 }).then((res) => setOrders(res.data.orders));
   }, []);
 
   const openCreate = () => {

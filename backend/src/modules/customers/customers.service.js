@@ -4,8 +4,14 @@
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
 
+const DEFAULT_PAGE_SIZE = 50;
+// Lebih tinggi dari batas wajar buat halaman list (production-orders.service.js pakai 200) -
+// dropdown "pilih customer" di form Buat PO butuh akses ke SEMUA customer, bukan cuma 1 halaman.
+// Daftar nama/HP polos jauh lebih ringan daripada tabel PO dengan banyak kolom+relasi.
+const MAX_PAGE_SIZE = 10000;
+
 async function list(query) {
-  const { segment, source, search } = query;
+  const { segment, source, search, page, pageSize } = query;
 
   const where = {
     ...(segment ? { segment } : {}),
@@ -20,17 +26,34 @@ async function list(query) {
       : {}),
   };
 
-  const customers = await prisma.customer.findMany({
-    where,
-    orderBy: { customerId: 'asc' },
-    include: { _count: { select: { productionOrders: true } } },
-  });
+  // Wajib dipaginasi - tabel ini sekarang 3.800+ baris (migrasi pelanggan POS lama), findMany
+  // tanpa batas bikin tab browser staf lambat/freeze - lihat migrate-legacy-data.js.
+  const take = Math.min(Number(pageSize) || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const currentPage = Math.max(Number(page) || 1, 1);
+  const skip = (currentPage - 1) * take;
 
-  return customers.map(({ _count, ...customer }) => ({
-    ...customer,
-    orderCount: _count.productionOrders,
-    isRepeatCustomer: _count.productionOrders > 1,
-  }));
+  const [customers, total] = await Promise.all([
+    prisma.customer.findMany({
+      where,
+      orderBy: { customerId: 'asc' },
+      include: { _count: { select: { productionOrders: true } } },
+      take,
+      skip,
+    }),
+    prisma.customer.count({ where }),
+  ]);
+
+  return {
+    customers: customers.map(({ _count, ...customer }) => ({
+      ...customer,
+      orderCount: _count.productionOrders,
+      isRepeatCustomer: _count.productionOrders > 1,
+    })),
+    total,
+    page: currentPage,
+    pageSize: take,
+    totalPages: Math.max(1, Math.ceil(total / take)),
+  };
 }
 
 async function getById(id) {

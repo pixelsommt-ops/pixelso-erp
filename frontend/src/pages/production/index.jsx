@@ -51,8 +51,8 @@ export default function ProductionPage() {
     setTaskForm(EMPTY_TASK_FORM);
     setTaskFormError('');
     setSelectedOrderDetail(null);
-    const res = await productionOrdersService.list({ status: 'queue' });
-    setQueueOrders(res.data);
+    const res = await productionOrdersService.list({ status: 'queue', pageSize: 200 });
+    setQueueOrders(res.data.orders);
     if (hasRole('manager')) {
       const rolesRes = await usersService.listRoles();
       const prodRole = rolesRes.data.find((r) => r.roleName === 'production');

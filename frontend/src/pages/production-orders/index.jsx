@@ -20,6 +20,13 @@ export default function ProductionOrdersPage() {
 
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  // Default rentang tanggal: bulan berjalan - histori migrasi POS lama (2+ tahun) bikin daftar
+  // tanpa filter jadi puluhan ribu baris. Bisa dikosongkan manual buat lihat semua histori.
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(startOfMonth);
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
@@ -34,13 +41,28 @@ export default function ProductionOrdersPage() {
   const [designers, setDesigners] = useState([]);
 
   const fetchOrders = useCallback(
-    () => productionOrdersService.list({ status: statusFilter || undefined, search: search || undefined }),
-    [statusFilter, search]
+    () =>
+      productionOrdersService.list({
+        status: statusFilter || undefined,
+        search: search || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page,
+      }),
+    [statusFilter, search, dateFrom, dateTo, page]
   );
-  const { data: orders, loading, error, reload } = useFetch(fetchOrders, [fetchOrders]);
+  const { data: listResult, loading, error, reload } = useFetch(fetchOrders, [fetchOrders]);
+  const orders = listResult?.orders;
+
+  // Ganti filter/tanggal -> balik ke halaman 1 (kalau tidak, bisa nyangkut di halaman yang
+  // sekarang kosong kalau hasil filter baru lebih sedikit dari sebelumnya).
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, search, dateFrom, dateTo]);
 
   useEffect(() => {
-    customersService.list().then((res) => setCustomers(res.data));
+    // pageSize besar - dropdown pilih customer butuh akses ke semua (bukan cuma 1 halaman list).
+    customersService.list({ pageSize: 10000 }).then((res) => setCustomers(res.data.customers));
     productsService.list().then((res) => setProducts(res.data));
     if (role === 'manager') {
       usersService.listRoles().then(async (res) => {
@@ -154,9 +176,41 @@ export default function ProductionOrdersPage() {
             </option>
           ))}
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, margin: 0, whiteSpace: 'nowrap' }}>
+          Dari
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, margin: 0, whiteSpace: 'nowrap' }}>
+          Sampai
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </label>
+        {(dateFrom || dateTo) && (
+          <button type="button" className="btn btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); }}>
+            Lihat semua histori
+          </button>
+        )}
       </div>
 
       <DataTable columns={columns} rows={orders} loading={loading} error={error} rowKey="poId" onRowClick={openDetail} />
+
+      {listResult && listResult.totalPages > 1 && (
+        <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
+          <button type="button" className="btn btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            &larr; Sebelumnya
+          </button>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
+            Halaman {listResult.page} dari {listResult.totalPages} ({listResult.total} PO)
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setPage((p) => Math.min(listResult.totalPages, p + 1))}
+            disabled={page >= listResult.totalPages}
+          >
+            Selanjutnya &rarr;
+          </button>
+        </div>
+      )}
 
       {createOpen && (
         <Modal title="Buat Production Order" onClose={closeCreate} width={680}>

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as customersService from '../../services/customersService';
 import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/common/DataTable';
@@ -10,14 +10,20 @@ const EMPTY_FORM = { name: '', phone: '', segment: '', source: '' };
 
 export default function CustomersPage() {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [modalCustomer, setModalCustomer] = useState(null); // create/edit form
   const [detailCustomer, setDetailCustomer] = useState(null); // read-only detail + order history
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchCustomers = useCallback(() => customersService.list({ search: search || undefined }), [search]);
-  const { data: customers, loading, error, reload } = useFetch(fetchCustomers, [fetchCustomers]);
+  const fetchCustomers = useCallback(() => customersService.list({ search: search || undefined, page }), [search, page]);
+  const { data: listResult, loading, error, reload } = useFetch(fetchCustomers, [fetchCustomers]);
+  const customers = listResult?.customers;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -112,6 +118,25 @@ export default function CustomersPage() {
         rowKey="customerId"
         onRowClick={openDetail}
       />
+
+      {listResult && listResult.totalPages > 1 && (
+        <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
+          <button type="button" className="btn btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            &larr; Sebelumnya
+          </button>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
+            Halaman {listResult.page} dari {listResult.totalPages} ({listResult.total} customer)
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setPage((p) => Math.min(listResult.totalPages, p + 1))}
+            disabled={page >= listResult.totalPages}
+          >
+            Selanjutnya &rarr;
+          </button>
+        </div>
+      )}
 
       {modalCustomer && (
         <Modal title={modalCustomer.customerId ? 'Edit Customer' : 'Tambah Customer'} onClose={closeModal}>

@@ -17,6 +17,13 @@ export default function PosPage() {
   const canVoid = hasRole('manager', 'finance');
 
   const [paidStatusFilter, setPaidStatusFilter] = useState('');
+  // Default rentang tanggal: bulan berjalan - histori migrasi POS lama (2+ tahun) bikin daftar
+  // tanpa filter jadi puluhan ribu baris. Bisa dikosongkan manual buat lihat semua histori.
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(startOfMonth);
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
@@ -29,16 +36,27 @@ export default function PosPage() {
   const [actioning, setActioning] = useState(false);
 
   const fetchSales = useCallback(
-    () => posService.list({ paidStatus: paidStatusFilter || undefined }),
-    [paidStatusFilter]
+    () =>
+      posService.list({
+        paidStatus: paidStatusFilter || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page,
+      }),
+    [paidStatusFilter, dateFrom, dateTo, page]
   );
-  const { data: sales, loading, error, reload } = useFetch(fetchSales, [fetchSales]);
+  const { data: listResult, loading, error, reload } = useFetch(fetchSales, [fetchSales]);
+  const sales = listResult?.sales;
+
+  useEffect(() => {
+    setPage(1);
+  }, [paidStatusFilter, dateFrom, dateTo]);
 
   const openCreate = async () => {
     setForm(EMPTY_FORM);
     setFormError('');
-    const res = await productionOrdersService.list({ status: 'approved' });
-    setApprovedOrders(res.data);
+    const res = await productionOrdersService.list({ status: 'approved', pageSize: 200 });
+    setApprovedOrders(res.data.orders);
     setCreateOpen(true);
   };
   const closeCreate = () => setCreateOpen(false);
@@ -155,9 +173,41 @@ export default function PosPage() {
           <option value="paid">paid</option>
           <option value="void">void</option>
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, margin: 0, whiteSpace: 'nowrap' }}>
+          Dari
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, margin: 0, whiteSpace: 'nowrap' }}>
+          Sampai
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </label>
+        {(dateFrom || dateTo) && (
+          <button type="button" className="btn btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); }}>
+            Lihat semua histori
+          </button>
+        )}
       </div>
 
       <DataTable columns={columns} rows={sales} loading={loading} error={error} rowKey="saleId" onRowClick={openDetail} />
+
+      {listResult && listResult.totalPages > 1 && (
+        <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
+          <button type="button" className="btn btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            &larr; Sebelumnya
+          </button>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
+            Halaman {listResult.page} dari {listResult.totalPages} ({listResult.total} sale)
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setPage((p) => Math.min(listResult.totalPages, p + 1))}
+            disabled={page >= listResult.totalPages}
+          >
+            Selanjutnya &rarr;
+          </button>
+        </div>
+      )}
 
       {createOpen && (
         <Modal title="Buat Invoice" onClose={closeCreate}>
