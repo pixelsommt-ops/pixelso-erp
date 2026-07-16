@@ -29,6 +29,7 @@ const settingsRoutes = require('./modules/settings/settings.routes');
 const promoRoutes = require('./modules/promo/promo.routes');
 const categoryRoutes = require('./modules/category/category.routes');
 const pricingModeRoutes = require('./modules/pricingMode/pricingMode.routes');
+const supplierRoutes = require('./modules/supplier/supplier.routes');
 
 const app = express();
 
@@ -93,6 +94,8 @@ app.use('/api/promos', promoRoutes);
 app.use('/api/categories', categoryRoutes);
 // Master Mode Harga - dipakai dropdown "Mode Harga" di Pricing, dikelola dari Master Produk
 app.use('/api/pricing-modes', pricingModeRoutes);
+// Master Supplier - dikelola dari Master Produk, diisi awal dari migrasi data POS lama
+app.use('/api/suppliers', supplierRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

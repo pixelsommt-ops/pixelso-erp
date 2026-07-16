@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as productsService from '../../services/productsService';
 import * as categoryService from '../../services/categoryService';
 import * as pricingModeService from '../../services/pricingModeService';
+import * as supplierService from '../../services/supplierService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
@@ -12,6 +13,7 @@ const EMPTY_FORM = { name: '', categoryId: '', unit: '', basePrice: '', priceGro
 const EMPTY_CATEGORY_FORM = { name: '' };
 const EMPTY_MODE_FORM = { key: '', label: '', calcType: 'scalar', unitLabel: '', inputLabel: '', sortOrder: 0 };
 const CALC_TYPE_LABELS = { area: 'Luas (Lebar x Tinggi)', scalar: 'Angka Tunggal (jumlah/durasi/berat, dst)' };
+const EMPTY_SUPPLIER_FORM = { name: '', address: '', phone: '', contact: '' };
 
 export default function ProductsPage() {
   const { hasRole } = useAuth();
@@ -33,6 +35,13 @@ export default function ProductsPage() {
   const [modeError, setModeError] = useState('');
   const [submittingMode, setSubmittingMode] = useState(false);
 
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [supplierPage, setSupplierPage] = useState(1);
+  const [modalSupplier, setModalSupplier] = useState(null);
+  const [supplierForm, setSupplierForm] = useState(EMPTY_SUPPLIER_FORM);
+  const [supplierError, setSupplierError] = useState('');
+  const [submittingSupplier, setSubmittingSupplier] = useState(false);
+
   const fetchProducts = useCallback(() => productsService.list({ search: search || undefined }), [search]);
   const { data: products, loading, error, reload } = useFetch(fetchProducts, [fetchProducts]);
 
@@ -43,6 +52,18 @@ export default function ProductsPage() {
   const fetchPricingModes = useCallback(() => pricingModeService.list(), []);
   const { data: pricingModes, loading: loadingModes, error: modesError, reload: reloadModes } =
     useFetch(fetchPricingModes, [fetchPricingModes]);
+
+  const fetchSuppliers = useCallback(
+    () => supplierService.list({ search: supplierSearch || undefined, page: supplierPage }),
+    [supplierSearch, supplierPage]
+  );
+  const { data: supplierResult, loading: loadingSuppliers, error: suppliersError, reload: reloadSuppliers } =
+    useFetch(fetchSuppliers, [fetchSuppliers]);
+  const suppliers = supplierResult?.suppliers;
+
+  useEffect(() => {
+    setSupplierPage(1);
+  }, [supplierSearch]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -196,6 +217,54 @@ export default function ProductsPage() {
     }
   };
 
+  const openCreateSupplier = () => {
+    setSupplierForm(EMPTY_SUPPLIER_FORM);
+    setSupplierError('');
+    setModalSupplier({});
+  };
+
+  const openEditSupplier = (supplier) => {
+    setSupplierForm({
+      name: supplier.name,
+      address: supplier.address || '',
+      phone: supplier.phone || '',
+      contact: supplier.contact || '',
+    });
+    setSupplierError('');
+    setModalSupplier(supplier);
+  };
+
+  const closeSupplierModal = () => setModalSupplier(null);
+
+  const handleSupplierSubmit = async (e) => {
+    e.preventDefault();
+    setSupplierError('');
+    setSubmittingSupplier(true);
+    try {
+      if (modalSupplier?.supplierId) {
+        await supplierService.update(modalSupplier.supplierId, supplierForm);
+      } else {
+        await supplierService.create(supplierForm);
+      }
+      closeSupplierModal();
+      reloadSuppliers();
+    } catch (err) {
+      setSupplierError(err?.response?.data?.message || 'Gagal menyimpan supplier');
+    } finally {
+      setSubmittingSupplier(false);
+    }
+  };
+
+  const handleDeleteSupplier = async (supplier) => {
+    if (!window.confirm(`Hapus supplier "${supplier.name}"?`)) return;
+    try {
+      await supplierService.deleteSupplier(supplier.supplierId);
+      reloadSuppliers();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'Gagal menghapus supplier');
+    }
+  };
+
   const categoryColumns = [
     { key: 'name', label: 'Nama Kategori' },
     ...(canManage
@@ -235,6 +304,31 @@ export default function ProductsPage() {
                   Edit
                 </button>
                 <button type="button" className="btn btn-sm" onClick={() => handleDeleteMode(r)}>
+                  Hapus
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  const supplierColumns = [
+    { key: 'name', label: 'Nama Supplier' },
+    { key: 'address', label: 'Alamat', render: (r) => r.address || '-' },
+    { key: 'phone', label: 'Telp', render: (r) => r.phone || '-' },
+    { key: 'contact', label: 'Kontak', render: (r) => r.contact || '-' },
+    ...(canManage
+      ? [
+          {
+            key: 'actions',
+            label: '',
+            render: (r) => (
+              <div className="btn-group">
+                <button type="button" className="btn btn-sm" onClick={() => openEditSupplier(r)}>
+                  Edit
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => handleDeleteSupplier(r)}>
                   Hapus
                 </button>
               </div>
@@ -307,6 +401,53 @@ export default function ProductsPage() {
         error={modesError}
         rowKey="modeId"
       />
+
+      <div className="page-header" style={{ marginTop: '2rem' }}>
+        <h1>Master Supplier</h1>
+        {canManage && (
+          <button type="button" className="btn btn-primary" onClick={openCreateSupplier}>
+            + Tambah Supplier
+          </button>
+        )}
+      </div>
+      <div className="filters">
+        <input
+          type="text"
+          placeholder="Cari nama/no. HP supplier..."
+          value={supplierSearch}
+          onChange={(e) => setSupplierSearch(e.target.value)}
+        />
+      </div>
+      <DataTable
+        columns={supplierColumns}
+        rows={suppliers}
+        loading={loadingSuppliers}
+        error={suppliersError}
+        rowKey="supplierId"
+      />
+      {supplierResult && supplierResult.totalPages > 1 && (
+        <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
+            disabled={supplierPage <= 1}
+          >
+            &larr; Sebelumnya
+          </button>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
+            Halaman {supplierResult.page} dari {supplierResult.totalPages} ({supplierResult.total} supplier)
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setSupplierPage((p) => Math.min(supplierResult.totalPages, p + 1))}
+            disabled={supplierPage >= supplierResult.totalPages}
+          >
+            Selanjutnya &rarr;
+          </button>
+        </div>
+      )}
 
       <div className="page-header" style={{ marginTop: '2rem' }}>
         <h1>Master Produk</h1>
@@ -430,6 +571,57 @@ export default function ProductsPage() {
               </button>
               <button type="submit" className="btn btn-primary" disabled={submittingMode}>
                 {submittingMode ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modalSupplier && (
+        <Modal title={modalSupplier.supplierId ? 'Edit Supplier' : 'Tambah Supplier'} onClose={closeSupplierModal}>
+          <form onSubmit={handleSupplierSubmit}>
+            {supplierError && <div className="alert alert-error">{supplierError}</div>}
+            <div className="form-grid">
+              <div className="form-group full">
+                <label>Nama Supplier</label>
+                <input
+                  type="text"
+                  required
+                  value={supplierForm.name}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                />
+              </div>
+              <div className="form-group full">
+                <label>Alamat</label>
+                <input
+                  type="text"
+                  value={supplierForm.address}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Telp</label>
+                <input
+                  type="text"
+                  value={supplierForm.phone}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Kontak (nama PIC)</label>
+                <input
+                  type="text"
+                  value={supplierForm.contact}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="btn-group" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={closeSupplierModal}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={submittingSupplier}>
+                {submittingSupplier ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </form>
