@@ -32,6 +32,11 @@ const MAX_PAGE_SIZE = 200;
 // sebelum submit, tapi tetap ditegakkan di sini juga (server adalah sumber kebenaran).
 const MIN_DP_RATIO = 0.5;
 
+// Produk mode area (Per m2) minimal ditagih seharga 1m2 walau ukuran aslinya lebih kecil -
+// standar harga cetak (order kecil tetap kena harga retail minimal), berlaku ke semua produk
+// mode area, bukan per-produk (beda dari minimumArea per-produk di storefront PrintProduct).
+const MIN_BILLABLE_AREA_M2 = 1;
+
 async function getCalcTypeByPricingModeKey() {
   const pricingModes = await prisma.pricingMode.findMany();
   return new Map(pricingModes.map((m) => [m.key, m.calcType]));
@@ -45,10 +50,14 @@ function quoteItemsFor(poDetails, calcTypeByKey) {
     const calcType = calcTypeByKey.get(detail.product.pricingMode) || 'scalar';
     const unitPrice = Number(detail.product.basePrice);
     let areaM2 = null;
+    let billedAreaM2 = null;
+    let minAreaApplied = false;
     let lineTotal;
     if (calcType === 'area') {
       areaM2 = (Number(detail.widthCm) / 100) * (Number(detail.heightCm) / 100);
-      lineTotal = areaM2 * detail.qty * unitPrice;
+      billedAreaM2 = Math.max(areaM2, MIN_BILLABLE_AREA_M2);
+      minAreaApplied = areaM2 < MIN_BILLABLE_AREA_M2;
+      lineTotal = billedAreaM2 * detail.qty * unitPrice;
     } else {
       lineTotal = unitPrice * detail.qty;
     }
@@ -59,6 +68,8 @@ function quoteItemsFor(poDetails, calcTypeByKey) {
       size: detail.size,
       calcType,
       areaM2,
+      billedAreaM2,
+      minAreaApplied,
       unitPrice,
       lineTotal,
     };
@@ -236,7 +247,9 @@ async function sendNotaEmail({ order, sale, quoteItems, subtotal, discountAmount
       (item) =>
         `<tr><td>${item.productName}</td><td>${
           item.calcType === 'area' ? `${item.size || ''} x${item.qty}` : `x${item.qty}`
-        }</td><td style="text-align:right">${formatRupiah(item.lineTotal)}</td></tr>`
+        }${item.minAreaApplied ? ' (min. 1m²)' : ''}</td><td style="text-align:right">${formatRupiah(
+          item.lineTotal
+        )}</td></tr>`
     )
     .join('');
 

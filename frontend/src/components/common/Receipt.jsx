@@ -30,7 +30,10 @@ export default function Receipt({ sale, settings, remaining }) {
         <div key={item.poDetailId} style={{ marginBottom: 2 }}>
           <div>{item.productName}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>{item.calcType === 'area' ? `${item.size || ''} x${item.qty}` : `x${item.qty}`}</span>
+            <span>
+              {item.calcType === 'area' ? `${item.size || ''} x${item.qty}` : `x${item.qty}`}
+              {item.minAreaApplied ? ' (min. 1m²)' : ''}
+            </span>
             <span>{formatCurrency(item.lineTotal)}</span>
           </div>
         </div>

@@ -12,6 +12,15 @@ import { formatCurrency, formatDateTime } from '../../utils/format';
 
 const EMPTY_FORM = { poId: '', discount: 0, dp: 0, paymentMethod: 'cash' };
 
+// Produk mode area ditagih minimal 1m2 (lihat MIN_BILLABLE_AREA_M2 di pos.service.js) - kalau
+// ukuran aslinya lebih kecil, tunjukkan itu supaya kasir/pelanggan tidak bingung kenapa harga
+// tidak sesuai perkalian ukuran mentah.
+function areaSizeLabel(item) {
+  if (item.calcType !== 'area') return `x${item.qty}`;
+  const suffix = item.minAreaApplied ? ` (min. 1 m²)` : ` (${item.areaM2?.toFixed(2)} m²)`;
+  return `${item.size || ''} x${item.qty}${suffix}`;
+}
+
 export default function PosPage() {
   const { hasRole } = useAuth();
   const canCreate = hasRole('cashier', 'manager');
@@ -301,11 +310,7 @@ export default function PosPage() {
                         {quote.items.map((item) => (
                           <tr key={item.poDetailId}>
                             <td>{item.productName}</td>
-                            <td>
-                              {item.calcType === 'area'
-                                ? `${item.size || ''} x${item.qty} (${item.areaM2?.toFixed(2)} m²)`
-                                : `x${item.qty}`}
-                            </td>
+                            <td>{areaSizeLabel(item)}</td>
                             <td>{formatCurrency(item.lineTotal)}</td>
                           </tr>
                         ))}

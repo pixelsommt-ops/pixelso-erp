@@ -87,6 +87,38 @@ describe('POS & Payments', () => {
     expect(res.body.data.paidStatus).toBe('paid');
   });
 
+  test('area-mode product under 1m2 is billed at the 1m2 minimum', async () => {
+    const designerToken = await loginAs('pos_designer@test.local', 'secret123');
+    const customer = await prisma.customer.create({ data: { name: 'Pos Min Area Customer' } });
+    const areaProduct = await prisma.product.create({
+      data: { name: 'Pos Min Area Product', basePrice: 40000, unit: 'm2', pricingMode: 'area' },
+    });
+
+    const createRes = await request(app)
+      .post('/api/production-orders')
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({
+        customerId: customer.customerId,
+        poDetails: [{ productId: areaProduct.productId, qty: 1, widthCm: 50, heightCm: 50 }], // 0.25 m2
+      });
+    const poId = createRes.body.data.poId;
+    await request(app)
+      .put(`/api/production-orders/${poId}`)
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({ status: 'approved' });
+
+    const quoteRes = await request(app)
+      .get(`/api/pos/quote/${poId}`)
+      .set('Authorization', `Bearer ${cashierToken}`);
+    expect(quoteRes.status).toBe(200);
+    const item = quoteRes.body.data.items[0];
+    expect(item.areaM2).toBeCloseTo(0.25);
+    expect(item.billedAreaM2).toBe(1);
+    expect(item.minAreaApplied).toBe(true);
+    expect(Number(item.lineTotal)).toBe(40000); // 1m2 minimum x 1 x 40000, not 0.25 x 40000
+    expect(Number(quoteRes.body.data.subtotal)).toBe(40000);
+  });
+
   test('creating invoice emails a nota to the customer when they have an email on file', async () => {
     sendMail.mockClear();
     const designerToken = await loginAs('pos_designer@test.local', 'secret123');
