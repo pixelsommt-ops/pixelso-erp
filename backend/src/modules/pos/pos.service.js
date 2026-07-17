@@ -4,6 +4,7 @@
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
 const { PO_STATUS, ROLES } = require('../../common/constants');
+const { notifyCustomerByEmail, formatRupiah } = require('../../common/utils/customerNotify');
 
 const DETAIL_INCLUDE = {
   productionOrder: {
@@ -149,7 +150,10 @@ async function create(data, currentUser) {
 
   const order = await prisma.productionOrder.findUnique({
     where: { poId: Number(poId) },
-    include: { poDetails: { include: { product: true } } },
+    include: {
+      poDetails: { include: { product: true } },
+      customer: { select: { customerId: true, name: true, email: true } },
+    },
   });
   if (!order) {
     throw new ApiError(400, 'Invalid poId');
@@ -159,7 +163,8 @@ async function create(data, currentUser) {
   }
 
   const calcTypeByKey = await getCalcTypeByPricingModeKey();
-  const subtotal = quoteItemsFor(order.poDetails, calcTypeByKey).reduce((sum, item) => sum + item.lineTotal, 0);
+  const quoteItems = quoteItemsFor(order.poDetails, calcTypeByKey);
+  const subtotal = quoteItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
   const total = Math.max(subtotal - (discount ? Number(discount) : 0), 0);
   const dpAmount = dp ? Number(dp) : 0;
@@ -200,7 +205,39 @@ async function create(data, currentUser) {
     return created;
   });
 
+  await sendNotaEmail({ order, sale, quoteItems, subtotal, discountAmount: discount ? Number(discount) : 0, total, dpAmount });
+
   return sale;
+}
+
+// Nota dikirim sebagai ringkasan teks/HTML - belum ada fitur cetak PDF nota di ERP ini.
+async function sendNotaEmail({ order, sale, quoteItems, subtotal, discountAmount, total, dpAmount }) {
+  const itemRows = quoteItems
+    .map(
+      (item) =>
+        `<tr><td>${item.productName}</td><td>${
+          item.calcType === 'area' ? `${item.size || ''} x${item.qty}` : `x${item.qty}`
+        }</td><td style="text-align:right">${formatRupiah(item.lineTotal)}</td></tr>`
+    )
+    .join('');
+
+  const html = `
+    <h2>Nota Pesanan ${order.poNumber}</h2>
+    <p>Terima kasih telah memesan di Pixelso.</p>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+      <thead><tr><th>Produk</th><th>Qty/Ukuran</th><th>Harga</th></tr></thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+    <p>
+      Subtotal: ${formatRupiah(subtotal)}<br/>
+      Diskon: ${formatRupiah(discountAmount)}<br/>
+      <strong>Total: ${formatRupiah(total)}</strong><br/>
+      DP dibayar: ${formatRupiah(dpAmount)}<br/>
+      Sisa: ${formatRupiah(Math.max(total - dpAmount, 0))}
+    </p>
+  `;
+
+  await notifyCustomerByEmail(order.customer, `Nota Pesanan ${order.poNumber} - Pixelso`, html);
 }
 
 async function update(id, data, currentUser) {

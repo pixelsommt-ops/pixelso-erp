@@ -1,3 +1,5 @@
+jest.mock('../src/common/utils/mailer');
+const { sendMail } = require('../src/common/utils/mailer');
 const { createUser, loginAs, prisma, app, request } = require('./helpers');
 
 describe('POS & Payments', () => {
@@ -83,5 +85,32 @@ describe('POS & Payments', () => {
       .send({ payment: { amount: 50000, method: 'transfer' } });
     expect(res.status).toBe(200);
     expect(res.body.data.paidStatus).toBe('paid');
+  });
+
+  test('creating invoice emails a nota to the customer when they have an email on file', async () => {
+    sendMail.mockClear();
+    const designerToken = await loginAs('pos_designer@test.local', 'secret123');
+    const customerWithEmail = await prisma.customer.create({
+      data: { name: 'Pos Emailed Customer', email: 'pos_customer@test.local' },
+    });
+    const product = await prisma.product.create({ data: { name: 'Pos Email Test Product', basePrice: 30000, unit: 'pcs' } });
+
+    const createRes = await request(app)
+      .post('/api/production-orders')
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({ customerId: customerWithEmail.customerId, poDetails: [{ productId: product.productId, qty: 1 }] });
+    const poId = createRes.body.data.poId;
+    await request(app)
+      .put(`/api/production-orders/${poId}`)
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({ status: 'approved' });
+
+    const res = await request(app)
+      .post('/api/pos')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ poId, dp: 15000, paymentMethod: 'cash' });
+    expect(res.status).toBe(201);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sendMail.mock.calls[0][0]).toMatchObject({ to: 'pos_customer@test.local' });
   });
 });

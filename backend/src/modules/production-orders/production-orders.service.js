@@ -4,6 +4,7 @@
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
 const { PO_STATUS, ROLES } = require('../../common/constants');
+const { notifyCustomerByEmail } = require('../../common/utils/customerNotify');
 
 // Alur status PO (PRD 3.5). hold/rework/complaint adalah cabang yang bisa kembali ke alur utama.
 const STATUS_TRANSITIONS = {
@@ -204,7 +205,7 @@ async function update(id, data) {
     }
   }
 
-  return prisma.productionOrder.update({
+  const updated = await prisma.productionOrder.update({
     where: { poId: Number(id) },
     data: {
       ...(status ? { status } : {}),
@@ -214,6 +215,17 @@ async function update(id, data) {
     },
     include: DETAIL_INCLUDE,
   });
+
+  if (status === PO_STATUS.READY && order.status !== PO_STATUS.READY) {
+    await notifyCustomerByEmail(
+      updated.customer,
+      `Pesanan ${updated.poNumber} Sudah Ready - Pixelso`,
+      `<p>Pesanan Anda <strong>${updated.poNumber}</strong> sudah ready, bisa diambil di toko.</p>
+       <p>Jika pesanan ingin diantar atau di COD-kan, silakan WA kami segera. Terima kasih.</p>`
+    );
+  }
+
+  return updated;
 }
 
 module.exports = { list, getById, create, update, generatePoNumber };

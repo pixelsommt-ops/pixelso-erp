@@ -1,3 +1,5 @@
+jest.mock('../src/common/utils/mailer');
+const { sendMail } = require('../src/common/utils/mailer');
 const { createUser, loginAs, prisma, app, request } = require('./helpers');
 
 describe('Production Orders lifecycle', () => {
@@ -81,5 +83,35 @@ describe('Production Orders lifecycle', () => {
       .send({ status: 'approved' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('approved');
+  });
+
+  test('transitioning to ready emails the customer, other transitions do not', async () => {
+    sendMail.mockClear();
+    const customerWithEmail = await prisma.customer.create({
+      data: { name: 'PO Ready Email Customer', email: 'po_ready_customer@test.local' },
+    });
+
+    const createRes = await request(app)
+      .post('/api/production-orders')
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({ customerId: customerWithEmail.customerId, poDetails: [{ productId, qty: 1 }] });
+    const poId = createRes.body.data.poId;
+
+    for (const status of ['approved', 'pos', 'material', 'queue', 'production', 'qc']) {
+      const res = await request(app)
+        .put(`/api/production-orders/${poId}`)
+        .set('Authorization', `Bearer ${designerToken}`)
+        .send({ status });
+      expect(res.status).toBe(200);
+    }
+    expect(sendMail).not.toHaveBeenCalled();
+
+    const readyRes = await request(app)
+      .put(`/api/production-orders/${poId}`)
+      .set('Authorization', `Bearer ${designerToken}`)
+      .send({ status: 'ready' });
+    expect(readyRes.status).toBe(200);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sendMail.mock.calls[0][0]).toMatchObject({ to: 'po_ready_customer@test.local' });
   });
 });
