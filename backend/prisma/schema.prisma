@@ -64,6 +64,9 @@ model Customer {
   phone      String?
   email      String?  @unique // NEW, nullable - row lama (walk-in, dibuat staf) tetap valid tanpa email
   password   String?  // NEW, nullable - hash bcrypt, cuma diisi akun self-service storefront
+  googleId   String?  @unique @map("google_id") // sub claim dari Google ID token, dipakai akun "Login dengan Google"
+  resetTokenHash      String?   @map("reset_token_hash") // SHA-256 dari token reset password mentah (mentahnya cuma dikirim lewat email, tidak pernah disimpan)
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at")
   segment    String?
   source     String?
   createdAt  DateTime @default(now()) @map("created_at")

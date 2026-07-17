@@ -1,5 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const prisma = require('../../db/prisma');
 const config = require('../../config');
 const ApiError = require('../../common/errors/ApiError');
@@ -9,6 +11,10 @@ const settingsService = require('../settings/settings.service');
 const promoService = require('../promo/promo.service');
 const { generatePoNumber } = require('../production-orders/production-orders.service');
 const { calculatePrintPrice } = require('./storefront.calculator');
+const { sendMail } = require('../../common/utils/mailer');
+
+const googleClient = config.googleClientId ? new OAuth2Client(config.googleClientId) : null;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 jam
 
 // Status internal PO dipetakan ke label ramah pelanggan - pelanggan tidak pernah lihat status mentah.
 const CUSTOMER_STATUS_LABELS = {
@@ -82,6 +88,98 @@ async function login({ email, password }) {
   if (!valid) {
     throw new ApiError(401, 'Invalid credentials');
   }
+  return issueToken(customer);
+}
+
+function hashToken(rawToken) {
+  return crypto.createHash('sha256').update(rawToken).digest('hex');
+}
+
+async function requestPasswordReset(email) {
+  if (!email) {
+    throw new ApiError(400, 'email is required');
+  }
+  const customer = await prisma.customer.findUnique({ where: { email } });
+  // Selalu balas sukses meski email tidak terdaftar/tidak punya password (akun Google-only) -
+  // supaya endpoint ini tidak bisa dipakai mengecek email mana yang sudah punya akun customer.
+  if (customer && customer.password) {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await prisma.customer.update({
+      where: { customerId: customer.customerId },
+      data: {
+        resetTokenHash: hashToken(rawToken),
+        resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      },
+    });
+    const resetUrl = `${config.storefrontUrl}/reset-password?token=${rawToken}`;
+    await sendMail({
+      to: customer.email,
+      subject: 'Reset Password Akun Pixelso',
+      html: `
+        <p>Halo ${customer.name},</p>
+        <p>Ada permintaan reset password untuk akun Pixelso Anda. Klik link di bawah untuk membuat password baru (berlaku 1 jam):</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>Kalau Anda tidak merasa meminta ini, abaikan saja email ini.</p>
+      `,
+    });
+  }
+  return { message: 'Kalau email terdaftar, link reset password sudah dikirim.' };
+}
+
+async function resetPassword({ token, password }) {
+  if (!token || !password) {
+    throw new ApiError(400, 'token and password are required');
+  }
+  if (password.length < 6) {
+    throw new ApiError(400, 'password must be at least 6 characters');
+  }
+  const customer = await prisma.customer.findFirst({
+    where: { resetTokenHash: hashToken(token), resetTokenExpiresAt: { gt: new Date() } },
+  });
+  if (!customer) {
+    throw new ApiError(400, 'Link reset password tidak valid atau sudah kedaluwarsa');
+  }
+  const hashed = await bcrypt.hash(password, 10);
+  await prisma.customer.update({
+    where: { customerId: customer.customerId },
+    data: { password: hashed, resetTokenHash: null, resetTokenExpiresAt: null },
+  });
+  return { message: 'Password berhasil diubah' };
+}
+
+async function googleLogin(idToken) {
+  if (!googleClient) {
+    throw new ApiError(500, 'Login Google belum dikonfigurasi di server');
+  }
+  if (!idToken) {
+    throw new ApiError(400, 'idToken is required');
+  }
+
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: config.googleClientId });
+    payload = ticket.getPayload();
+  } catch (err) {
+    throw new ApiError(401, 'Token Google tidak valid');
+  }
+
+  const { sub: googleId, email, name } = payload;
+  if (!email) {
+    throw new ApiError(400, 'Akun Google tidak punya email');
+  }
+
+  let customer = await prisma.customer.findFirst({ where: { OR: [{ googleId }, { email }] } });
+  if (customer) {
+    if (!customer.googleId) {
+      // Email sudah terdaftar lewat form biasa - tautkan akun Google ke situ, jangan buat duplikat.
+      customer = await prisma.customer.update({ where: { customerId: customer.customerId }, data: { googleId } });
+    }
+  } else {
+    customer = await prisma.customer.create({
+      data: { name: name || email, email, googleId, source: 'storefront-google' },
+    });
+  }
+
   return issueToken(customer);
 }
 
@@ -210,4 +308,16 @@ async function getMyOrder(customerId, poId) {
   return { ...order, statusLabel: CUSTOMER_STATUS_LABELS[order.status] || 'Diproses' };
 }
 
-module.exports = { register, login, getCatalog, getSiteSettings, getPromos, checkout, listMyOrders, getMyOrder };
+module.exports = {
+  register,
+  login,
+  requestPasswordReset,
+  resetPassword,
+  googleLogin,
+  getCatalog,
+  getSiteSettings,
+  getPromos,
+  checkout,
+  listMyOrders,
+  getMyOrder,
+};

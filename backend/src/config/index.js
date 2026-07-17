@@ -15,4 +15,8 @@ module.exports = {
   storefrontUploadMaxDesignBytes: Number(process.env.STOREFRONT_UPLOAD_MAX_DESIGN_BYTES || 50 * 1024 * 1024),
   storefrontUploadMaxProofBytes: Number(process.env.STOREFRONT_UPLOAD_MAX_PROOF_BYTES || 3 * 1024 * 1024),
   pricingUploadMaxPhotoBytes: Number(process.env.PRICING_UPLOAD_MAX_PHOTO_BYTES || 5 * 1024 * 1024),
+  gmailUser: process.env.GMAIL_USER,
+  gmailAppPassword: process.env.GMAIL_APP_PASSWORD,
+  storefrontUrl: process.env.STOREFRONT_URL || 'http://localhost:5174',
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
 };

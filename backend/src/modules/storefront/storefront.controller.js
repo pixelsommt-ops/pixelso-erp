@@ -12,6 +12,21 @@ const login = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const data = await service.requestPasswordReset(req.body.email);
+  res.json({ success: true, data });
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const data = await service.resetPassword(req.body);
+  res.json({ success: true, data });
+});
+
+const googleLogin = asyncHandler(async (req, res) => {
+  const data = await service.googleLogin(req.body.idToken);
+  res.json({ success: true, data });
+});
+
 const getCatalog = asyncHandler(async (req, res) => {
   const data = await service.getCatalog();
   res.json({ success: true, data });
@@ -47,4 +62,17 @@ const myOrderDetail = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { register, login, getCatalog, getSiteSettings, getPromos, upload, checkout, myOrders, myOrderDetail };
+module.exports = {
+  register,
+  login,
+  forgotPassword,
+  resetPassword,
+  googleLogin,
+  getCatalog,
+  getSiteSettings,
+  getPromos,
+  upload,
+  checkout,
+  myOrders,
+  myOrderDetail,
+};
