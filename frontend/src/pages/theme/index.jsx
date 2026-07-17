@@ -98,6 +98,10 @@ export default function ThemePage() {
     setForm((prev) => ({ ...prev, heroSlides: prev.heroSlides.filter((_, i) => i !== index) }));
   };
 
+  const removeLogo = () => {
+    setForm((prev) => ({ ...prev, logoUrl: '' }));
+  };
+
   const updateColor = (key, value) => {
     setForm((prev) => ({
       ...prev,
@@ -289,16 +293,22 @@ export default function ThemePage() {
 
             <h3 style={{ fontSize: '0.9rem', marginTop: '1.25rem' }}>Logo</h3>
             {form.logoUrl && (
-              <img
-                src={form.logoUrl}
-                alt="Logo tema"
-                style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--color-border)', marginBottom: '0.5rem' }}
-              />
+              <div style={{ marginBottom: '0.5rem' }}>
+                <img
+                  src={form.logoUrl}
+                  alt="Logo tema"
+                  style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--color-border)', display: 'block', marginBottom: '0.4rem' }}
+                />
+                <button type="button" className="btn btn-sm" onClick={removeLogo}>
+                  Hapus Logo
+                </button>
+              </div>
             )}
             <div>
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={uploadingLogo} />
               <small style={{ display: 'block', color: 'var(--text-muted, #666)' }}>
-                Kosongkan untuk pakai logo default Pixelso. {uploadingLogo && 'Mengunggah...'}
+                Ukuran disarankan 600x600px (persegi), file asli maks. 5MB. Kosongkan untuk pakai logo default Pixelso.{' '}
+                {uploadingLogo && 'Mengunggah...'}
               </small>
             </div>
 
@@ -323,7 +333,12 @@ export default function ThemePage() {
               </div>
             )}
             {form.heroSlides.length < MAX_HERO_SLIDES && (
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleHeroUpload} disabled={uploadingHero} />
+              <>
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleHeroUpload} disabled={uploadingHero} />
+                <small style={{ display: 'block', color: 'var(--text-muted, #666)' }}>
+                  Ukuran disarankan 1920x1080px, file asli maks. 5MB.
+                </small>
+              </>
             )}
             {uploadingHero && <small style={{ color: 'var(--text-muted, #666)' }}>Mengunggah...</small>}
 
