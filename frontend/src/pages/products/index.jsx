@@ -19,6 +19,8 @@ export default function ProductsPage() {
   const { hasRole } = useAuth();
   const canManage = hasRole('manager', 'inventory');
 
+  const [tab, setTab] = useState('produk');
+
   const [search, setSearch] = useState('');
   const [modalProduct, setModalProduct] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -370,108 +372,142 @@ export default function ProductsPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Master Kategori</h1>
-        {canManage && (
-          <button type="button" className="btn btn-primary" onClick={openCreateCategory}>
-            + Tambah Kategori
-          </button>
-        )}
+        <h1>Master Produk</h1>
       </div>
-      <DataTable
-        columns={categoryColumns}
-        rows={categories}
-        loading={loadingCategories}
-        error={categoriesError}
-        rowKey="categoryId"
-      />
+      <div className="tabs">
+        <button type="button" className={`tab ${tab === 'kategori' ? 'active' : ''}`} onClick={() => setTab('kategori')}>
+          Master Kategori
+        </button>
+        <button type="button" className={`tab ${tab === 'mode' ? 'active' : ''}`} onClick={() => setTab('mode')}>
+          Master Mode Harga
+        </button>
+        <button type="button" className={`tab ${tab === 'supplier' ? 'active' : ''}`} onClick={() => setTab('supplier')}>
+          Master Supplier
+        </button>
+        <button type="button" className={`tab ${tab === 'produk' ? 'active' : ''}`} onClick={() => setTab('produk')}>
+          Master Produk
+        </button>
+      </div>
 
-      <div className="page-header" style={{ marginTop: '2rem' }}>
-        <h1>Master Mode Harga</h1>
-        {canManage && (
-          <button type="button" className="btn btn-primary" onClick={openCreateMode}>
-            + Tambah Mode
-          </button>
-        )}
-      </div>
-      <p style={{ margin: '0 0 0.75rem', color: 'var(--text-muted, #666)', fontSize: '0.85rem' }}>
-        Daftar mode kalkulasi harga yang bisa dipilih di halaman Harga Website. Mode "Luas" butuh
-        ukuran Lebar x Tinggi (mis. Per m²); mode "Angka Tunggal" butuh satu angka saja
-        (mis. Per Pcs, Per Menit, Per Gram).
-      </p>
-      <DataTable
-        columns={modeColumns}
-        rows={pricingModes}
-        loading={loadingModes}
-        error={modesError}
-        rowKey="modeId"
-      />
-
-      <div className="page-header" style={{ marginTop: '2rem' }}>
-        <h1>Master Supplier</h1>
-        {canManage && (
-          <button type="button" className="btn btn-primary" onClick={openCreateSupplier}>
-            + Tambah Supplier
-          </button>
-        )}
-      </div>
-      <div className="filters">
-        <input
-          type="text"
-          placeholder="Cari nama/no. HP supplier..."
-          value={supplierSearch}
-          onChange={(e) => setSupplierSearch(e.target.value)}
-        />
-      </div>
-      <DataTable
-        columns={supplierColumns}
-        rows={suppliers}
-        loading={loadingSuppliers}
-        error={suppliersError}
-        rowKey="supplierId"
-      />
-      {supplierResult && supplierResult.totalPages > 1 && (
-        <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
-            disabled={supplierPage <= 1}
-          >
-            &larr; Sebelumnya
-          </button>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
-            Halaman {supplierResult.page} dari {supplierResult.totalPages} ({supplierResult.total} supplier)
-          </span>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setSupplierPage((p) => Math.min(supplierResult.totalPages, p + 1))}
-            disabled={supplierPage >= supplierResult.totalPages}
-          >
-            Selanjutnya &rarr;
-          </button>
+      {tab === 'kategori' && (
+        <div>
+          <div className="page-header">
+            <h1 style={{ fontSize: '1rem' }}>Master Kategori</h1>
+            {canManage && (
+              <button type="button" className="btn btn-primary" onClick={openCreateCategory}>
+                + Tambah Kategori
+              </button>
+            )}
+          </div>
+          <DataTable
+            columns={categoryColumns}
+            rows={categories}
+            loading={loadingCategories}
+            error={categoriesError}
+            rowKey="categoryId"
+          />
         </div>
       )}
 
-      <div className="page-header" style={{ marginTop: '2rem' }}>
-        <h1>Master Produk</h1>
-        {canManage && (
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            + Tambah Produk
-          </button>
-        )}
-      </div>
+      {tab === 'mode' && (
+        <div>
+          <div className="page-header">
+            <h1 style={{ fontSize: '1rem' }}>Master Mode Harga</h1>
+            {canManage && (
+              <button type="button" className="btn btn-primary" onClick={openCreateMode}>
+                + Tambah Mode
+              </button>
+            )}
+          </div>
+          <p style={{ margin: '0 0 0.75rem', color: 'var(--text-muted, #666)', fontSize: '0.85rem' }}>
+            Daftar mode kalkulasi harga yang bisa dipilih di halaman Harga Website. Mode "Luas" butuh
+            ukuran Lebar x Tinggi (mis. Per m²); mode "Angka Tunggal" butuh satu angka saja
+            (mis. Per Pcs, Per Menit, Per Gram).
+          </p>
+          <DataTable
+            columns={modeColumns}
+            rows={pricingModes}
+            loading={loadingModes}
+            error={modesError}
+            rowKey="modeId"
+          />
+        </div>
+      )}
 
-      <div className="filters">
-        <input
-          type="text"
-          placeholder="Cari nama produk..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      {tab === 'supplier' && (
+        <div>
+          <div className="page-header">
+            <h1 style={{ fontSize: '1rem' }}>Master Supplier</h1>
+            {canManage && (
+              <button type="button" className="btn btn-primary" onClick={openCreateSupplier}>
+                + Tambah Supplier
+              </button>
+            )}
+          </div>
+          <div className="filters">
+            <input
+              type="text"
+              placeholder="Cari nama/no. HP supplier..."
+              value={supplierSearch}
+              onChange={(e) => setSupplierSearch(e.target.value)}
+            />
+          </div>
+          <DataTable
+            columns={supplierColumns}
+            rows={suppliers}
+            loading={loadingSuppliers}
+            error={suppliersError}
+            rowKey="supplierId"
+          />
+          {supplierResult && supplierResult.totalPages > 1 && (
+            <div className="btn-group" style={{ marginTop: '0.75rem', justifyContent: 'center', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
+                disabled={supplierPage <= 1}
+              >
+                &larr; Sebelumnya
+              </button>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #666)' }}>
+                Halaman {supplierResult.page} dari {supplierResult.totalPages} ({supplierResult.total} supplier)
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setSupplierPage((p) => Math.min(supplierResult.totalPages, p + 1))}
+                disabled={supplierPage >= supplierResult.totalPages}
+              >
+                Selanjutnya &rarr;
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
-      <DataTable columns={columns} rows={products} loading={loading} error={error} rowKey="productId" />
+      {tab === 'produk' && (
+        <div>
+          <div className="page-header">
+            <h1 style={{ fontSize: '1rem' }}>Master Produk</h1>
+            {canManage && (
+              <button type="button" className="btn btn-primary" onClick={openCreate}>
+                + Tambah Produk
+              </button>
+            )}
+          </div>
+
+          <div className="filters">
+            <input
+              type="text"
+              placeholder="Cari nama produk..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <DataTable columns={columns} rows={products} loading={loading} error={error} rowKey="productId" />
+        </div>
+      )}
 
       {modalCategory && (
         <Modal title={modalCategory.categoryId ? 'Edit Kategori' : 'Tambah Kategori'} onClose={closeCategoryModal}>
