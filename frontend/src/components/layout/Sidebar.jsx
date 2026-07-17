@@ -22,10 +22,12 @@ const NAV_ITEMS = [
     label: 'HRM & Payroll',
     roles: null,
     children: [
-      { to: '/hrm/positions', label: 'Jabatan & Hierarki' },
-      { to: '/hrm/contracts', label: 'Kontrak Kerja' },
-      { to: '/hrm/attendance', label: 'Kehadiran' },
-      { to: '/hrm/shifts', label: 'Manajemen Shift' },
+      { to: '/hrm/positions', label: 'Jabatan & Hierarki', roles: null },
+      // Backend contract.routes.js membatasi seluruh router (termasuk GET) ke HRD/manager -
+      // disembunyikan dari role lain supaya tidak menabrak 403.
+      { to: '/hrm/contracts', label: 'Kontrak Kerja', roles: ['hrd', 'manager'] },
+      { to: '/hrm/attendance', label: 'Kehadiran', roles: null },
+      { to: '/hrm/shifts', label: 'Manajemen Shift', roles: null },
     ],
   },
   { to: '/customers', label: 'Customer & CRM', roles: null },
@@ -39,7 +41,14 @@ const NAV_ITEMS = [
 export default function Sidebar({ open, onClose }) {
   const { role } = useAuth();
   const location = useLocation();
-  const items = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role));
+  const items = NAV_ITEMS
+    .filter((item) => !item.roles || item.roles.includes(role))
+    .map((item) =>
+      item.children
+        ? { ...item, children: item.children.filter((child) => !child.roles || child.roles.includes(role)) }
+        : item
+    )
+    .filter((item) => !item.children || item.children.length > 0);
 
   // Grup auto-expand kalau route aktif ada di dalam salah satu child-nya.
   const [openGroups, setOpenGroups] = useState(() => {
