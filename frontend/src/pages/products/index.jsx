@@ -9,7 +9,7 @@ import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { formatCurrency } from '../../utils/format';
 
-const EMPTY_FORM = { name: '', categoryId: '', unit: '', basePrice: '', priceGrosir1: '', priceGrosir23: '', priceHpp: '' };
+const EMPTY_FORM = { name: '', categoryId: '', unit: '', pricingMode: 'unit', basePrice: '', priceGrosir1: '', priceGrosir23: '', priceHpp: '' };
 const EMPTY_CATEGORY_FORM = { name: '' };
 const EMPTY_MODE_FORM = { key: '', label: '', calcType: 'scalar', unitLabel: '', inputLabel: '', sortOrder: 0 };
 const CALC_TYPE_LABELS = { area: 'Luas (Lebar x Tinggi)', scalar: 'Angka Tunggal (jumlah/durasi/berat, dst)' };
@@ -76,6 +76,7 @@ export default function ProductsPage() {
       name: product.name,
       categoryId: product.categoryId || '',
       unit: product.unit || '',
+      pricingMode: product.pricingMode || 'unit',
       basePrice: product.basePrice,
       priceGrosir1: product.priceGrosir1 ?? '',
       priceGrosir23: product.priceGrosir23 ?? '',
@@ -338,10 +339,13 @@ export default function ProductsPage() {
       : []),
   ];
 
+  const modeLabelByKey = new Map((pricingModes || []).map((m) => [m.key, m.label]));
+
   const columns = [
     { key: 'name', label: 'Nama Produk' },
     { key: 'category', label: 'Kategori', render: (r) => r.category?.name || '-' },
     { key: 'unit', label: 'Satuan', render: (r) => r.unit || '-' },
+    { key: 'pricingMode', label: 'Mode Harga', render: (r) => modeLabelByKey.get(r.pricingMode) || r.pricingMode },
     { key: 'basePrice', label: 'Harga Retail', render: (r) => formatCurrency(r.basePrice) },
     ...(canManage
       ? [
@@ -661,6 +665,22 @@ export default function ProductsPage() {
                   value={form.unit}
                   onChange={(e) => setForm({ ...form, unit: e.target.value })}
                 />
+              </div>
+              <div className="form-group">
+                <label>Mode Harga</label>
+                <select
+                  value={form.pricingMode}
+                  onChange={(e) => setForm({ ...form, pricingMode: e.target.value })}
+                >
+                  {(pricingModes || [])
+                    .filter((m) => m.isActive || m.key === form.pricingMode)
+                    .map((m) => (
+                      <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                </select>
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 4 }}>
+                  Menentukan input di form Buat PO: mode area minta Lebar x Tinggi, mode lain cuma Qty.
+                </p>
               </div>
               <div className="form-group">
                 <label>Harga Retail</label>

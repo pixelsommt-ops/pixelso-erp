@@ -89,6 +89,7 @@ model Product {
   priceHpp       Decimal?      @map("price_hpp") @db.Decimal(14, 2) // harga pokok/modal
   unit           String?
   printProductId Int?          @unique @map("print_product_id") // NEW - link ke katalog storefront (PrintProduct)
+  pricingMode    String        @default("unit") @map("pricing_mode") // referensi PricingMode.key (bukan FK, sama seperti PrintProduct.pricingMode) - dipakai form Buat PO untuk tentukan input Lebar x Tinggi (area) vs Qty saja (scalar)
 
   poDetails    PoDetail[]
   printProduct PrintProduct? @relation(fields: [printProductId], references: [printProductId])

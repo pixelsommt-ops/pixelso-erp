@@ -137,6 +137,24 @@ async function create(data, currentUser) {
   if (products.length !== new Set(productIds).size) {
     throw new ApiError(400, 'One or more productId is invalid');
   }
+  const productById = new Map(products.map((p) => [p.productId, p]));
+
+  // Mode area (mis. "Per m2") butuh Lebar x Tinggi, mode lain (Per Pcs, Per Menit, dst) cuma Qty -
+  // sama seperti kalkulator storefront (storefront.calculator.js), tapi ini untuk PO staff input manual.
+  const pricingModes = await prisma.pricingMode.findMany();
+  const calcTypeByKey = new Map(pricingModes.map((m) => [m.key, m.calcType]));
+
+  for (const item of poDetails) {
+    const product = productById.get(Number(item.productId));
+    const calcType = calcTypeByKey.get(product.pricingMode) || 'scalar';
+    if (calcType === 'area') {
+      const width = Number(item.widthCm);
+      const height = Number(item.heightCm);
+      if (!width || width <= 0 || !height || height <= 0) {
+        throw new ApiError(400, `Produk "${product.name}" pakai mode area - Lebar dan Tinggi wajib diisi (> 0)`);
+      }
+    }
+  }
 
   const poNumber = await generatePoNumber();
 
@@ -149,13 +167,22 @@ async function create(data, currentUser) {
       dueAt: dueAt ? new Date(dueAt) : undefined,
       notes,
       poDetails: {
-        create: poDetails.map((item) => ({
-          productId: Number(item.productId),
-          qty: Number(item.qty),
-          size: item.size,
-          fileUrl: item.fileUrl,
-          specNote: item.specNote,
-        })),
+        create: poDetails.map((item) => {
+          const product = productById.get(Number(item.productId));
+          const calcType = calcTypeByKey.get(product.pricingMode) || 'scalar';
+          const isArea = calcType === 'area';
+          const widthCm = isArea ? Math.round(Number(item.widthCm) * 100) / 100 : null;
+          const heightCm = isArea ? Math.round(Number(item.heightCm) * 100) / 100 : null;
+          return {
+            productId: Number(item.productId),
+            qty: Number(item.qty),
+            size: isArea ? `${widthCm} x ${heightCm} cm` : item.size,
+            widthCm,
+            heightCm,
+            fileUrl: item.fileUrl,
+            specNote: item.specNote,
+          };
+        }),
       },
     },
     include: DETAIL_INCLUDE,

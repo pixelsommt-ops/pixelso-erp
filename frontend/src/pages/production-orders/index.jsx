@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as productionOrdersService from '../../services/productionOrdersService';
 import * as customersService from '../../services/customersService';
 import * as productsService from '../../services/productsService';
+import * as pricingModeService from '../../services/pricingModeService';
 import * as usersService from '../../services/usersService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
@@ -11,7 +12,7 @@ import StatusBadge from '../../components/common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { PO_STATUS_OPTIONS, PO_STATUS_TRANSITIONS } from '../../utils/poStatusFlow';
 
-const EMPTY_ITEM = { productId: '', qty: 1, size: '', specNote: '' };
+const EMPTY_ITEM = { productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '' };
 const EMPTY_FORM = { customerId: '', designerId: '', priority: 0, dueAt: '', notes: '', poDetails: [{ ...EMPTY_ITEM }] };
 
 export default function ProductionOrdersPage() {
@@ -39,6 +40,7 @@ export default function ProductionOrdersPage() {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [designers, setDesigners] = useState([]);
+  const [pricingModes, setPricingModes] = useState([]);
 
   const fetchOrders = useCallback(
     () =>
@@ -64,6 +66,7 @@ export default function ProductionOrdersPage() {
     // pageSize besar - dropdown pilih customer butuh akses ke semua (bukan cuma 1 halaman list).
     customersService.list({ pageSize: 10000 }).then((res) => setCustomers(res.data.customers));
     productsService.list().then((res) => setProducts(res.data));
+    pricingModeService.list().then((res) => setPricingModes(res.data));
     if (role === 'manager') {
       usersService.listRoles().then(async (res) => {
         const designerRole = res.data.find((r) => r.roleName === 'designer');
@@ -76,6 +79,11 @@ export default function ProductionOrdersPage() {
   }, [role]);
 
   const productMap = useMemo(() => Object.fromEntries(products.map((p) => [p.productId, p])), [products]);
+  const calcTypeByModeKey = useMemo(() => new Map(pricingModes.map((m) => [m.key, m.calcType])), [pricingModes]);
+  const isAreaProduct = (productId) => {
+    const product = productMap[productId];
+    return product && calcTypeByModeKey.get(product.pricingMode) === 'area';
+  };
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -105,7 +113,9 @@ export default function ProductionOrdersPage() {
         poDetails: form.poDetails.map((item) => ({
           productId: Number(item.productId),
           qty: Number(item.qty),
-          size: item.size || undefined,
+          ...(isAreaProduct(item.productId)
+            ? { widthCm: Number(item.widthCm), heightCm: Number(item.heightCm) }
+            : {}),
           specNote: item.specNote || undefined,
         })),
       };
@@ -309,10 +319,32 @@ export default function ProductionOrdersPage() {
                     onChange={(e) => updateItem(index, 'qty', e.target.value)}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Ukuran</label>
-                  <input type="text" value={item.size} onChange={(e) => updateItem(index, 'size', e.target.value)} />
-                </div>
+                {isAreaProduct(item.productId) && (
+                  <>
+                    <div className="form-group">
+                      <label>Lebar (cm)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={item.widthCm}
+                        onChange={(e) => updateItem(index, 'widthCm', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Tinggi (cm)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={item.heightCm}
+                        onChange={(e) => updateItem(index, 'heightCm', e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="form-group">
                   <label>Catatan Item</label>
                   <input

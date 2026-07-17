@@ -22,11 +22,24 @@ async function getById(id) {
   return product;
 }
 
+// Mode harga (area/unit/menit/gram/dst) - lihat pricing.service.js#validatePricingMode, versi
+// sama persis dipakai di sini karena Master Produk (internal) validasi lepas dari PrintProduct
+// (storefront) meski keduanya rujuk tabel PricingMode yang sama.
+async function validatePricingMode(pricingMode) {
+  const mode = await prisma.pricingMode.findUnique({ where: { key: pricingMode } });
+  if (!mode || !mode.isActive) {
+    throw new ApiError(400, 'Mode harga tidak valid atau tidak aktif - kelola di Master Mode Harga');
+  }
+}
+
 async function create(data) {
-  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit } = data;
+  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit, pricingMode } = data;
 
   if (!name) {
     throw new ApiError(400, 'name is required');
+  }
+  if (pricingMode) {
+    await validatePricingMode(pricingMode);
   }
 
   return prisma.product.create({
@@ -34,6 +47,7 @@ async function create(data) {
       name,
       categoryId: categoryId ? Number(categoryId) : null,
       unit,
+      pricingMode: pricingMode || undefined,
       basePrice: basePrice !== undefined ? Number(basePrice) : undefined,
       priceGrosir1: priceGrosir1 !== undefined && priceGrosir1 !== null ? Number(priceGrosir1) : null,
       priceGrosir23: priceGrosir23 !== undefined && priceGrosir23 !== null ? Number(priceGrosir23) : null,
@@ -43,11 +57,14 @@ async function create(data) {
 }
 
 async function update(id, data) {
-  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit } = data;
+  const { name, categoryId, basePrice, priceGrosir1, priceGrosir23, priceHpp, unit, pricingMode } = data;
 
   const product = await prisma.product.findUnique({ where: { productId: Number(id) } });
   if (!product) {
     throw new ApiError(404, 'Product not found');
+  }
+  if (pricingMode) {
+    await validatePricingMode(pricingMode);
   }
 
   return prisma.product.update({
@@ -56,6 +73,7 @@ async function update(id, data) {
       ...(name ? { name } : {}),
       ...(categoryId !== undefined ? { categoryId: categoryId ? Number(categoryId) : null } : {}),
       ...(unit !== undefined ? { unit } : {}),
+      ...(pricingMode ? { pricingMode } : {}),
       ...(basePrice !== undefined ? { basePrice: Number(basePrice) } : {}),
       ...(priceGrosir1 !== undefined ? { priceGrosir1: priceGrosir1 !== null ? Number(priceGrosir1) : null } : {}),
       ...(priceGrosir23 !== undefined ? { priceGrosir23: priceGrosir23 !== null ? Number(priceGrosir23) : null } : {}),
