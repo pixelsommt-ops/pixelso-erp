@@ -31,6 +31,10 @@ const categoryRoutes = require('./modules/category/category.routes');
 const pricingModeRoutes = require('./modules/pricingMode/pricingMode.routes');
 const supplierRoutes = require('./modules/supplier/supplier.routes');
 const themeRoutes = require('./modules/theme/theme.routes');
+const cashAccountRoutes = require('./modules/cashAccount/cashAccount.routes');
+const expenseRoutes = require('./modules/expense/expense.routes');
+const purchasingRoutes = require('./modules/purchasing/purchasing.routes');
+const assetRoutes = require('./modules/asset/asset.routes');
 
 const app = express();
 
@@ -100,6 +104,11 @@ app.use('/api/suppliers', supplierRoutes);
 // Tema Website (event: Kemerdekaan, Idul Fitri, dst) - tema aktif dibaca storefront lewat
 // /api/storefront/settings (lihat storefront.service.js#getSiteSettings), bukan endpoint ini langsung
 app.use('/api/themes', themeRoutes);
+// Finance extensions: Purchasing & Procurement, Expense/Cash & Bank, Asset Management
+app.use('/api/cash-accounts', cashAccountRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/purchasing', purchasingRoutes);
+app.use('/api/assets', assetRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

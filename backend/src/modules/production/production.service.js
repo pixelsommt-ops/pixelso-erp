@@ -4,6 +4,7 @@
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
 const { PO_STATUS } = require('../../common/constants');
+const { applyStockMovement } = require('../../common/utils/stockMovement');
 
 const TASK_STATUS = { QUEUE: 'queue', IN_PROGRESS: 'in_progress', DONE: 'done', REWORK: 'rework' };
 
@@ -91,7 +92,7 @@ async function create(data) {
   });
 }
 
-async function update(id, data) {
+async function update(id, data, currentUser) {
   const { status, machineId, operatorId } = data;
 
   const task = await prisma.productionTask.findUnique({
@@ -151,6 +152,26 @@ async function update(id, data) {
     if (status === TASK_STATUS.DONE) {
       taskData.finishAt = new Date();
       if (task.machineId) machineStatus = 'idle';
+
+      // Konsumsi Material otomatis kalau item ini ditautkan (PoDetail.materialId/materialQty -
+      // opsional, lihat production-orders.service.js#setDetailMaterial). Dicek dulu supaya task
+      // yang berpindah done->rework->done lagi tidak mengonsumsi material dua kali (lihat komentar
+      // StockMovement.poDetailId di schema.prisma).
+      if (task.poDetail.materialId && task.poDetail.materialQty) {
+        const alreadyConsumed = await tx.stockMovement.findFirst({
+          where: { poDetailId: task.poDetail.poDetailId, type: 'out' },
+        });
+        if (!alreadyConsumed) {
+          await applyStockMovement(tx, {
+            materialId: task.poDetail.materialId,
+            type: 'out',
+            qty: task.poDetail.materialQty,
+            poId: task.poDetail.productionOrder.poId,
+            poDetailId: task.poDetail.poDetailId,
+            createdBy: currentUser?.userId,
+          });
+        }
+      }
     }
 
     if (status === TASK_STATUS.REWORK) {

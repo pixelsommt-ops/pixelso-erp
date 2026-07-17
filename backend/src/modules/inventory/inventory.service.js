@@ -3,8 +3,7 @@
 
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
-
-const MOVEMENT_TYPES = ['in', 'out', 'reserve', 'adjustment'];
+const { applyStockMovement, MOVEMENT_TYPES } = require('../../common/utils/stockMovement');
 
 async function list(query) {
   const { search, lowStock } = query;
@@ -51,16 +50,14 @@ async function create(data) {
       data: {
         name,
         unit,
-        stockQty: initialQty,
+        stockQty: 0,
         minStock: minStock ? Number(minStock) : 0,
         avgCost: avgCost ? Number(avgCost) : 0,
       },
     });
 
     if (initialQty > 0) {
-      await tx.stockMovement.create({
-        data: { materialId: material.materialId, type: 'in', qty: initialQty },
-      });
+      return applyStockMovement(tx, { materialId: material.materialId, type: 'in', qty: initialQty });
     }
 
     return material;
@@ -77,15 +74,6 @@ async function update(id, data, currentUser) {
 
   if (movement) {
     const { type, qty, poId } = movement;
-    if (!MOVEMENT_TYPES.includes(type)) {
-      throw new ApiError(400, `movement.type must be one of ${MOVEMENT_TYPES.join(', ')}`);
-    }
-    if (qty === undefined || qty === null || Number(qty) === 0) {
-      throw new ApiError(400, 'movement.qty must be non-zero');
-    }
-    if (type !== 'adjustment' && Number(qty) < 0) {
-      throw new ApiError(400, `movement.qty must be > 0 for type '${type}'`);
-    }
     if (poId) {
       const order = await prisma.productionOrder.findUnique({ where: { poId: Number(poId) } });
       if (!order) {
@@ -93,36 +81,9 @@ async function update(id, data, currentUser) {
       }
     }
 
-    const currentQty = Number(material.stockQty);
-    let newQty;
-    if (type === 'in') {
-      newQty = currentQty + Number(qty);
-    } else if (type === 'adjustment') {
-      // Koreksi stock opname: qty boleh negatif (kurang) atau positif (lebih).
-      newQty = currentQty + Number(qty);
-      if (newQty < 0) {
-        throw new ApiError(400, `Adjustment would result in negative stock (${newQty})`);
-      }
-    } else {
-      // out | reserve both consume available stock
-      if (Number(qty) > currentQty) {
-        throw new ApiError(400, `Insufficient stock: available ${currentQty}, requested ${qty}`);
-      }
-      newQty = currentQty - Number(qty);
-    }
-
-    return prisma.$transaction(async (tx) => {
-      await tx.stockMovement.create({
-        data: {
-          materialId: Number(id),
-          poId: poId ? Number(poId) : undefined,
-          type,
-          qty: Number(qty),
-          createdBy: currentUser?.userId,
-        },
-      });
-      return tx.material.update({ where: { materialId: Number(id) }, data: { stockQty: newQty } });
-    });
+    return prisma.$transaction((tx) =>
+      applyStockMovement(tx, { materialId: id, type, qty, poId, createdBy: currentUser?.userId })
+    );
   }
 
   return prisma.material.update({

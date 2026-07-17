@@ -23,4 +23,9 @@ const update = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update };
+const setDetailMaterial = asyncHandler(async (req, res) => {
+  const data = await service.setDetailMaterial(req.params.detailId, req.body);
+  res.json({ success: true, data });
+});
+
+module.exports = { list, getById, create, update, setDetailMaterial };

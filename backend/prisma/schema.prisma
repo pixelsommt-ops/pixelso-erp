@@ -51,6 +51,8 @@ model User {
   dailyKpis         DailyKpi[]
   notifications     Notification[]
   confirmedPayments Payment[]
+  expenses          Expense[]
+  purchaseOrders    PurchaseOrder[]
 
   @@map("users")
 }
@@ -232,6 +234,8 @@ model Supplier {
   contact    String?
   createdAt  DateTime @default(now()) @map("created_at")
 
+  purchaseOrders PurchaseOrder[]
+
   @@map("suppliers")
 }
 
@@ -297,9 +301,17 @@ model PoDetail {
   selectedOptions Json?   @map("selected_options")
   designLink      String? @map("design_link") // link desain eksternal (Drive/Canva/dsb), sejajar fileUrl
 
+  // NEW - link opsional ke Material yang dipakai item ini, supaya stok otomatis berkurang saat
+  // ProductionTask-nya selesai (lihat production.service.js). Opsional & per-item (bukan resep/BOM
+  // per produk) - staf isi kalau relevan, tidak wajib untuk semua order.
+  materialId  Int?     @map("material_id")
+  materialQty Decimal? @map("material_qty") @db.Decimal(14, 2)
+
   productionOrder ProductionOrder  @relation(fields: [poId], references: [poId])
   product         Product          @relation(fields: [productId], references: [productId])
+  material        Material?        @relation(fields: [materialId], references: [materialId])
   productionTasks ProductionTask[]
+  stockMovements  StockMovement[]
 
   @@map("po_details")
 }
@@ -349,7 +361,9 @@ model Material {
   minStock   Decimal @default(0) @map("min_stock") @db.Decimal(14, 2)
   avgCost    Decimal @default(0) @map("avg_cost") @db.Decimal(14, 2)
 
-  stockMovements StockMovement[]
+  stockMovements     StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+  poDetails          PoDetail[]
 
   @@map("materials")
 }
@@ -358,6 +372,11 @@ model StockMovement {
   moveId     Int      @id @default(autoincrement()) @map("move_id")
   materialId Int      @map("material_id")
   poId       Int?     @map("po_id")
+  // NEW - dipakai konsumsi otomatis dari production.service.js (lihat PoDetail.materialId/materialQty)
+  // untuk cek idempotency: tanpa ini, task yang berpindah done->rework->done lagi bisa mengonsumsi
+  // material dua kali. Nullable karena movement manual (dari inventory.service.js) tidak selalu
+  // terkait satu PoDetail spesifik.
+  poDetailId Int?     @map("po_detail_id")
   type       String   // in | out | reserve | adjustment
   qty        Decimal  @db.Decimal(14, 2)
   createdBy  Int?     @map("created_by")
@@ -365,6 +384,7 @@ model StockMovement {
 
   material        Material         @relation(fields: [materialId], references: [materialId])
   productionOrder ProductionOrder? @relation(fields: [poId], references: [poId])
+  poDetail        PoDetail?        @relation(fields: [poDetailId], references: [poDetailId])
 
   @@map("stock_movements")
 }
@@ -510,4 +530,94 @@ model Notification {
 
   @@unique([userId, type, refType, refId])
   @@map("notifications")
+}
+
+// ---------- Finance extensions: Purchasing, Expense/Cash & Bank, Asset Management ----------
+
+model CashAccount {
+  cashAccountId  Int      @id @default(autoincrement()) @map("cash_account_id")
+  name           String
+  type           String // 'cash' | 'bank'
+  bankName       String?  @map("bank_name")
+  accountNumber  String?  @map("account_number")
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  expenses       Expense[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("cash_accounts")
+}
+
+model Expense {
+  expenseId     Int      @id @default(autoincrement()) @map("expense_id")
+  cashAccountId Int      @map("cash_account_id")
+  category      String
+  amount        Decimal  @db.Decimal(14, 2)
+  expenseDate   DateTime @map("expense_date")
+  description   String?  @db.Text
+  createdBy     Int      @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  cashAccount CashAccount @relation(fields: [cashAccountId], references: [cashAccountId])
+  creator     User        @relation(fields: [createdBy], references: [userId])
+
+  @@map("expenses")
+}
+
+// Pembelian ke supplier (uang keluar) - terpisah dari ProductionOrder yang mewakili order penjualan
+// masuk. Tidak otomatis update Material.stockQty (keputusan eksplisit user, di luar cakupan pass ini).
+model PurchaseOrder {
+  purchaseOrderId Int       @id @default(autoincrement()) @map("purchase_order_id")
+  poNumber        String    @unique @map("po_number")
+  supplierId      Int       @map("supplier_id")
+  status          String    @default("draft") // draft -> ordered -> received -> paid ; cancelled dari draft/ordered
+  orderDate       DateTime  @default(now()) @map("order_date")
+  expectedDate    DateTime? @map("expected_date")
+  paidAt          DateTime? @map("paid_at")
+  cashAccountId   Int?      @map("cash_account_id") // diisi saat status -> paid
+  totalAmount     Decimal   @default(0) @map("total_amount") @db.Decimal(14, 2) // denormalized sum(items)
+  notes           String?   @db.Text
+  createdBy       Int       @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  supplier    Supplier            @relation(fields: [supplierId], references: [supplierId])
+  cashAccount CashAccount?        @relation(fields: [cashAccountId], references: [cashAccountId])
+  creator     User                @relation(fields: [createdBy], references: [userId])
+  items       PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  purchaseOrderItemId Int     @id @default(autoincrement()) @map("purchase_order_item_id")
+  purchaseOrderId     Int     @map("purchase_order_id")
+  materialId          Int?    @map("material_id") // opsional - tidak semua pembelian masuk katalog Material
+  description         String
+  qty                 Decimal @db.Decimal(14, 2)
+  unitPrice           Decimal @map("unit_price") @db.Decimal(14, 2)
+  lineTotal           Decimal @map("line_total") @db.Decimal(14, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [purchaseOrderId], onDelete: Cascade)
+  material      Material?     @relation(fields: [materialId], references: [materialId])
+
+  @@map("purchase_order_items")
+}
+
+model Asset {
+  assetId         Int       @id @default(autoincrement()) @map("asset_id")
+  name            String
+  category        String?
+  acquisitionDate DateTime? @map("acquisition_date")
+  acquisitionCost Decimal?  @map("acquisition_cost") @db.Decimal(14, 2)
+  currentValue    Decimal?  @map("current_value") @db.Decimal(14, 2)
+  location        String?
+  status          String    @default("active") // active | maintenance | disposed
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("assets")
 }

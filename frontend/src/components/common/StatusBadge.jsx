@@ -17,6 +17,8 @@ const VARIANT_MAP = {
   partial: 'info',
   pending: 'info',
   idle: 'info',
+  ordered: 'info',
+  received: 'info',
   // perhatian
   qc: 'warning',
   hold: 'warning',

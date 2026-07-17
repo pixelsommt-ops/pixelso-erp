@@ -31,7 +31,7 @@ const LIST_INCLUDE = {
 const DETAIL_INCLUDE = {
   customer: true,
   designer: { select: { userId: true, name: true, email: true } },
-  poDetails: { include: { product: true } },
+  poDetails: { include: { product: true, material: { select: { materialId: true, name: true, unit: true } } } },
 };
 
 async function generatePoNumber() {
@@ -140,6 +140,21 @@ async function create(data, currentUser) {
   }
   const productById = new Map(products.map((p) => [p.productId, p]));
 
+  // Link opsional per-item ke Material (bukan resep/BOM per produk) - kalau diisi, stok Material
+  // otomatis berkurang saat ProductionTask item ini selesai (lihat production.service.js).
+  const materialIds = poDetails.filter((item) => item.materialId).map((item) => Number(item.materialId));
+  if (materialIds.length > 0) {
+    const materials = await prisma.material.findMany({ where: { materialId: { in: materialIds } } });
+    if (materials.length !== new Set(materialIds).size) {
+      throw new ApiError(400, 'One or more materialId is invalid');
+    }
+  }
+  for (const item of poDetails) {
+    if (item.materialId && (!item.materialQty || Number(item.materialQty) <= 0)) {
+      throw new ApiError(400, 'materialQty is required (> 0) when materialId is set');
+    }
+  }
+
   // Mode area (mis. "Per m2") butuh Lebar x Tinggi, mode lain (Per Pcs, Per Menit, dst) cuma Qty -
   // sama seperti kalkulator storefront (storefront.calculator.js), tapi ini untuk PO staff input manual.
   const pricingModes = await prisma.pricingMode.findMany();
@@ -182,6 +197,8 @@ async function create(data, currentUser) {
             heightCm,
             fileUrl: item.fileUrl,
             specNote: item.specNote,
+            materialId: item.materialId ? Number(item.materialId) : undefined,
+            materialQty: item.materialId ? Number(item.materialQty) : undefined,
           };
         }),
       },
@@ -228,4 +245,41 @@ async function update(id, data) {
   return updated;
 }
 
-module.exports = { list, getById, create, update, generatePoNumber };
+// Kaitkan/ubah link Material+qty pada satu item PO setelah PO dibuat (poDetails sendiri tidak
+// bisa diedit setelah create, sama seperti produk/qty/ukuran - tapi link material ini murni
+// metadata konsumsi, jadi dibiarkan bisa diubah kapan saja SEBELUM task-nya selesai/konsumsi
+// tercatat; setelahnya diblokir supaya tidak membingungkan riwayat StockMovement yang sudah ada).
+async function setDetailMaterial(poDetailId, data) {
+  const { materialId, materialQty } = data;
+
+  const detail = await prisma.poDetail.findUnique({ where: { poDetailId: Number(poDetailId) } });
+  if (!detail) {
+    throw new ApiError(404, 'PO detail not found');
+  }
+
+  const alreadyConsumed = await prisma.stockMovement.findFirst({
+    where: { poDetailId: Number(poDetailId), type: 'out' },
+  });
+  if (alreadyConsumed) {
+    throw new ApiError(400, 'Material item ini sudah dikonsumsi (task sudah selesai) - tidak bisa diubah lagi');
+  }
+
+  if (materialId === null) {
+    return prisma.poDetail.update({ where: { poDetailId: Number(poDetailId) }, data: { materialId: null, materialQty: null } });
+  }
+
+  if (!materialId || !materialQty || Number(materialQty) <= 0) {
+    throw new ApiError(400, 'materialId and materialQty (> 0) are required');
+  }
+  const material = await prisma.material.findUnique({ where: { materialId: Number(materialId) } });
+  if (!material) {
+    throw new ApiError(400, 'Invalid materialId');
+  }
+
+  return prisma.poDetail.update({
+    where: { poDetailId: Number(poDetailId) },
+    data: { materialId: Number(materialId), materialQty: Number(materialQty) },
+  });
+}
+
+module.exports = { list, getById, create, update, setDetailMaterial, generatePoNumber };

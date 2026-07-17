@@ -12,6 +12,7 @@ router.use(authenticate);
 
 // Laporan omzet/HPP/margin - didaftarkan sebelum '/:id', hanya finance & manager.
 router.get('/reports/revenue', authorize(ROLES.FINANCE, ROLES.MANAGER), controller.getRevenueReport);
+router.get('/reports/expense-summary', authorize(ROLES.FINANCE, ROLES.MANAGER), controller.getExpenseSummary);
 router.post('/bonus/auto-calculate', authorize(ROLES.FINANCE, ROLES.MANAGER), controller.autoCalculateBonus);
 
 // Bonus records - list/getById dibatasi ke bonus milik sendiri kecuali finance/manager (lihat service).

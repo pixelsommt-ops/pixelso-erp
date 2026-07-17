@@ -28,9 +28,14 @@ const getRevenueReport = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const getExpenseSummary = asyncHandler(async (req, res) => {
+  const data = await service.getExpenseSummary(req.query);
+  res.json({ success: true, data });
+});
+
 const autoCalculateBonus = asyncHandler(async (req, res) => {
   const data = await service.autoCalculateBonus(req.body.period);
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update, getRevenueReport, autoCalculateBonus };
+module.exports = { list, getById, create, update, getRevenueReport, getExpenseSummary, autoCalculateBonus };

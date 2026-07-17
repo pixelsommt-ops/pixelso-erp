@@ -31,6 +31,7 @@ async function getSummary(query) {
     activeTaskGroups,
     criticalStock,
     revenue,
+    expenseSummary,
     overdueOrders,
     complaintOrders,
   ] = await Promise.all([
@@ -40,6 +41,7 @@ async function getSummary(query) {
     prisma.productionTask.groupBy({ by: ['status'], _count: { status: true } }),
     prisma.material.findMany(),
     financeService.getRevenueReport(query),
+    financeService.getExpenseSummary(query),
     prisma.productionOrder.findMany({
       where: { dueAt: { lt: now }, status: { notIn: ['done'] } },
       select: { poId: true, poNumber: true, status: true, dueAt: true, customer: { select: { name: true } } },
@@ -66,7 +68,7 @@ async function getSummary(query) {
       taskByStatus: taskQueueBreakdown,
     },
     stokKritis: lowStockMaterials,
-    keuangan: { omzet: revenue.omzet, hpp: revenue.hpp, margin: revenue.margin },
+    keuangan: { omzet: revenue.omzet, hpp: revenue.hpp, margin: revenue.margin, pengeluaran: expenseSummary.total },
     keterlambatan: overdueOrders,
     komplain: complaintOrders,
   };

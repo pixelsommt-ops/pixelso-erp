@@ -67,8 +67,12 @@ function ManagerDashboard() {
               <div className="value">{formatCurrency(data.keuangan.omzet)}</div>
             </div>
             <div className="stat-tile">
-              <div className="label">Margin</div>
+              <div className="label">Laba Kotor</div>
               <div className="value">{formatCurrency(data.keuangan.margin)}</div>
+            </div>
+            <div className="stat-tile">
+              <div className="label">Pengeluaran</div>
+              <div className="value">{formatCurrency(data.keuangan.pengeluaran)}</div>
             </div>
           </div>
 

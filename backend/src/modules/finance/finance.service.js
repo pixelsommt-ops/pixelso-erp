@@ -153,6 +153,29 @@ async function getRevenueReport(query) {
   };
 }
 
+// --- Ringkasan Pengeluaran (Expense operasional + PurchaseOrder yang sudah lunas) ---
+// Dipakai dashboard "Pengeluaran" dan bisa dipanggil langsung lewat /reports/expense-summary.
+
+async function getExpenseSummary(query) {
+  const { from, to } = parseRange(query);
+
+  const [expenseAgg, purchaseAgg] = await Promise.all([
+    prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+    prisma.purchaseOrder.aggregate({ where: { status: 'paid', paidAt: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
+  ]);
+
+  const expenseTotal = Number(expenseAgg._sum.amount || 0);
+  const purchaseTotal = Number(purchaseAgg._sum.totalAmount || 0);
+
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    expenseTotal,
+    purchaseTotal,
+    total: expenseTotal + purchaseTotal,
+  };
+}
+
 // --- Bonus Otomatis ---
 // Formula belum ada di PRD/dokumen sumber, jadi dipakai rate tetap per aktivitas (Rp/unit),
 // terdokumentasi di sini dan mudah diubah. score = jumlah aktivitas pada periode tsb, amount = score * rate.
@@ -240,4 +263,4 @@ async function autoCalculateBonus(period) {
   return results;
 }
 
-module.exports = { list, getById, create, update, getRevenueReport, autoCalculateBonus };
+module.exports = { list, getById, create, update, getRevenueReport, getExpenseSummary, autoCalculateBonus };

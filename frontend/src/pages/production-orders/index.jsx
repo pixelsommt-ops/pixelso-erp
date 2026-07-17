@@ -4,6 +4,7 @@ import * as customersService from '../../services/customersService';
 import * as productsService from '../../services/productsService';
 import * as pricingModeService from '../../services/pricingModeService';
 import * as usersService from '../../services/usersService';
+import * as inventoryService from '../../services/inventoryService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
@@ -13,7 +14,7 @@ import StatusBadge from '../../components/common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { PO_STATUS_OPTIONS, PO_STATUS_TRANSITIONS } from '../../utils/poStatusFlow';
 
-const EMPTY_ITEM = { productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '' };
+const EMPTY_ITEM = { productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '', materialId: '', materialQty: '' };
 const EMPTY_FORM = { customerId: '', designerId: '', priority: 0, dueAt: '', notes: '', poDetails: [{ ...EMPTY_ITEM }] };
 
 // Ukuran di bawah ini kemungkinan besar salah ketik (mis. "100" ketulis "1") - bukan batas keras,
@@ -46,6 +47,11 @@ export default function ProductionOrdersPage() {
   const [products, setProducts] = useState([]);
   const [designers, setDesigners] = useState([]);
   const [pricingModes, setPricingModes] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [materialLinkTarget, setMaterialLinkTarget] = useState(null);
+  const [materialLinkForm, setMaterialLinkForm] = useState({ materialId: '', materialQty: '' });
+  const [materialLinkError, setMaterialLinkError] = useState('');
+  const [materialLinkSubmitting, setMaterialLinkSubmitting] = useState(false);
 
   const fetchOrders = useCallback(
     () =>
@@ -72,6 +78,7 @@ export default function ProductionOrdersPage() {
     customersService.list({ pageSize: 10000 }).then((res) => setCustomers(res.data.customers));
     productsService.list().then((res) => setProducts(res.data));
     pricingModeService.list().then((res) => setPricingModes(res.data));
+    inventoryService.list({}).then((res) => setMaterials(res.data));
     if (role === 'manager') {
       usersService.listRoles().then(async (res) => {
         const designerRole = res.data.find((r) => r.roleName === 'designer');
@@ -139,6 +146,7 @@ export default function ProductionOrdersPage() {
             ? { widthCm: Number(item.widthCm), heightCm: Number(item.heightCm) }
             : {}),
           specNote: item.specNote || undefined,
+          ...(item.materialId ? { materialId: Number(item.materialId), materialQty: Number(item.materialQty) } : {}),
         })),
       };
       if (role === 'manager') {
@@ -160,6 +168,32 @@ export default function ProductionOrdersPage() {
     setTransitionError('');
   };
   const closeDetail = () => setDetail(null);
+
+  const openMaterialLink = (item) => {
+    setMaterialLinkForm({ materialId: item.materialId || '', materialQty: item.materialQty || '' });
+    setMaterialLinkError('');
+    setMaterialLinkTarget(item);
+  };
+  const closeMaterialLink = () => setMaterialLinkTarget(null);
+
+  const handleMaterialLinkSubmit = async (e) => {
+    e.preventDefault();
+    setMaterialLinkError('');
+    setMaterialLinkSubmitting(true);
+    try {
+      await productionOrdersService.setDetailMaterial(detail.poId, materialLinkTarget.poDetailId, {
+        materialId: materialLinkForm.materialId ? Number(materialLinkForm.materialId) : null,
+        materialQty: materialLinkForm.materialId ? Number(materialLinkForm.materialQty) : null,
+      });
+      const { data } = await productionOrdersService.getById(detail.poId);
+      setDetail(data);
+      closeMaterialLink();
+    } catch (err) {
+      setMaterialLinkError(err?.response?.data?.message || 'Gagal menautkan material');
+    } finally {
+      setMaterialLinkSubmitting(false);
+    }
+  };
 
   const transitionTo = async (status) => {
     setTransitioning(true);
@@ -371,6 +405,31 @@ export default function ProductionOrdersPage() {
                     onChange={(e) => updateItem(index, 'specNote', e.target.value)}
                   />
                 </div>
+                <div className="form-group">
+                  <label>Material (opsional)</label>
+                  <select value={item.materialId} onChange={(e) => updateItem(index, 'materialId', e.target.value)}>
+                    <option value="">- tidak ditautkan -</option>
+                    {materials.map((m) => (
+                      <option key={m.materialId} value={m.materialId}>{m.name}</option>
+                    ))}
+                  </select>
+                  <small style={{ color: 'var(--text-muted, #666)' }}>
+                    Stok material otomatis berkurang saat item ini selesai diproduksi.
+                  </small>
+                </div>
+                {item.materialId && (
+                  <div className="form-group">
+                    <label>Qty Material Dipakai</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      required
+                      value={item.materialQty}
+                      onChange={(e) => updateItem(index, 'materialQty', e.target.value)}
+                    />
+                  </div>
+                )}
                 {form.poDetails.length > 1 && (
                   <div className="form-group full">
                     <button type="button" className="btn btn-sm btn-danger" onClick={() => removeItem(index)}>
@@ -432,6 +491,8 @@ export default function ProductionOrdersPage() {
                   <th>Qty</th>
                   <th>Ukuran</th>
                   <th>Catatan</th>
+                  <th>Material</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -441,6 +502,12 @@ export default function ProductionOrdersPage() {
                     <td>{d.qty}</td>
                     <td>{d.size || '-'}</td>
                     <td>{d.specNote || '-'}</td>
+                    <td>{d.materialId ? `${d.material?.name || materials.find((m) => m.materialId === d.materialId)?.name} (${d.materialQty})` : '-'}</td>
+                    <td>
+                      <button type="button" className="btn btn-sm" onClick={() => openMaterialLink(d)}>
+                        {d.materialId ? 'Ubah' : 'Kaitkan Material'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -468,6 +535,51 @@ export default function ProductionOrdersPage() {
               </div>
             </div>
           )}
+        </Modal>
+      )}
+
+      {materialLinkTarget && (
+        <Modal title="Kaitkan Material" onClose={closeMaterialLink}>
+          <form onSubmit={handleMaterialLinkSubmit}>
+            {materialLinkError && <div className="alert alert-error">{materialLinkError}</div>}
+            <div className="form-grid">
+              <div className="form-group full">
+                <label>Material</label>
+                <select
+                  value={materialLinkForm.materialId}
+                  onChange={(e) => setMaterialLinkForm({ ...materialLinkForm, materialId: e.target.value })}
+                >
+                  <option value="">- tidak ditautkan -</option>
+                  {materials.map((m) => (
+                    <option key={m.materialId} value={m.materialId}>{m.name} (stok: {m.stockQty} {m.unit})</option>
+                  ))}
+                </select>
+              </div>
+              {materialLinkForm.materialId && (
+                <div className="form-group">
+                  <label>Qty Material Dipakai</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={materialLinkForm.materialQty}
+                    onChange={(e) => setMaterialLinkForm({ ...materialLinkForm, materialQty: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+            <small style={{ color: 'var(--text-muted, #666)' }}>
+              Stok material otomatis berkurang saat item ini selesai diproduksi (task status "done"). Tidak bisa
+              diubah lagi setelah itu terjadi.
+            </small>
+            <div className="btn-group" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={closeMaterialLink}>Batal</button>
+              <button type="submit" className="btn btn-primary" disabled={materialLinkSubmitting}>
+                {materialLinkSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>
