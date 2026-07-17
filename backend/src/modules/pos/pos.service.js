@@ -92,10 +92,20 @@ async function create(data, currentUser) {
     throw new ApiError(400, `Production order must be in '${PO_STATUS.APPROVED}' status before invoicing (currently '${order.status}')`);
   }
 
-  const subtotal = order.poDetails.reduce(
-    (sum, detail) => sum + Number(detail.product.basePrice) * detail.qty,
-    0
-  );
+  // Mode area (mis. Banner MMT, "Per m2") harus dikali luas (lebar x tinggi dalam cm -> m2),
+  // sama seperti production-orders.service.js#create - dulu di sini selalu flat basePrice x qty.
+  const pricingModes = await prisma.pricingMode.findMany();
+  const calcTypeByKey = new Map(pricingModes.map((m) => [m.key, m.calcType]));
+
+  const subtotal = order.poDetails.reduce((sum, detail) => {
+    const calcType = calcTypeByKey.get(detail.product.pricingMode) || 'scalar';
+    const price = Number(detail.product.basePrice);
+    if (calcType === 'area') {
+      const areaM2 = (Number(detail.widthCm) / 100) * (Number(detail.heightCm) / 100);
+      return sum + areaM2 * detail.qty * price;
+    }
+    return sum + price * detail.qty;
+  }, 0);
   const total = Math.max(subtotal - (discount ? Number(discount) : 0), 0);
   const dpAmount = dp ? Number(dp) : 0;
   if (dpAmount > total) {
