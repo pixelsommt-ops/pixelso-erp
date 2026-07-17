@@ -263,9 +263,28 @@ function TeamsTab() {
     }
   };
 
+  const handleDelete = async (team) => {
+    if (!window.confirm(`Hapus tim "${team.name}"?`)) return;
+    try {
+      await usersService.deleteTeam(team.teamId);
+      reload();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'Gagal menghapus tim');
+    }
+  };
+
   const columns = [
     { key: 'name', label: 'Nama Tim' },
     { key: 'memberCount', label: 'Jumlah Anggota', render: (r) => r._count?.users ?? 0 },
+    {
+      key: 'actions',
+      label: '',
+      render: (r) => (
+        <button type="button" className="btn btn-sm" onClick={() => handleDelete(r)}>
+          Hapus
+        </button>
+      ),
+    },
   ];
 
   return (

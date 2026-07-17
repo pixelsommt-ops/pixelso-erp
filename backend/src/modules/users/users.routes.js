@@ -15,6 +15,7 @@ router.use(authenticate);
 router.get('/roles', authorize(ROLES.MANAGER, ROLES.FINANCE, ROLES.HRD), controller.listRoles);
 router.get('/teams', authorize(ROLES.MANAGER), controller.listTeams);
 router.post('/teams', authorize(ROLES.MANAGER), controller.createTeam);
+router.delete('/teams/:id', authorize(ROLES.MANAGER), controller.deleteTeam);
 
 router.get('/', authorize(ROLES.MANAGER, ROLES.FINANCE, ROLES.HRD), controller.list);
 router.get('/:id', authorize(ROLES.MANAGER, ROLES.FINANCE, ROLES.HRD), controller.getById);

@@ -129,4 +129,19 @@ async function createTeam(data) {
   return prisma.team.create({ data: { name } });
 }
 
-module.exports = { list, getById, create, update, listRoles, listTeams, createTeam };
+async function deleteTeam(id) {
+  const teamId = Number(id);
+  const team = await prisma.team.findUnique({ where: { teamId } });
+  if (!team) {
+    throw new ApiError(404, 'Team not found');
+  }
+
+  const memberCount = await prisma.user.count({ where: { teamId } });
+  if (memberCount > 0) {
+    throw new ApiError(400, `Tim masih punya ${memberCount} anggota, tidak bisa dihapus`);
+  }
+
+  return prisma.team.delete({ where: { teamId } });
+}
+
+module.exports = { list, getById, create, update, listRoles, listTeams, createTeam, deleteTeam };

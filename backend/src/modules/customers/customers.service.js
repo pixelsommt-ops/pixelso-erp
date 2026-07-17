@@ -111,4 +111,19 @@ async function update(id, data) {
   });
 }
 
-module.exports = { list, getById, create, update };
+async function deleteCustomer(id) {
+  const customerId = Number(id);
+  const customer = await prisma.customer.findUnique({ where: { customerId } });
+  if (!customer) {
+    throw new ApiError(404, 'Customer not found');
+  }
+
+  const orderCount = await prisma.productionOrder.count({ where: { customerId } });
+  if (orderCount > 0) {
+    throw new ApiError(400, `Customer masih punya ${orderCount} riwayat order, tidak bisa dihapus`);
+  }
+
+  return prisma.customer.delete({ where: { customerId } });
+}
+
+module.exports = { list, getById, create, update, deleteCustomer };

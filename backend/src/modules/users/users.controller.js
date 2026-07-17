@@ -38,4 +38,9 @@ const createTeam = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update, listRoles, listTeams, createTeam };
+const deleteTeam = asyncHandler(async (req, res) => {
+  await service.deleteTeam(req.params.id);
+  res.json({ success: true, data: null });
+});
+
+module.exports = { list, getById, create, update, listRoles, listTeams, createTeam, deleteTeam };

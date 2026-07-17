@@ -23,4 +23,9 @@ const update = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update };
+const deleteCustomer = asyncHandler(async (req, res) => {
+  await service.deleteCustomer(req.params.id);
+  res.json({ success: true, data: null });
+});
+
+module.exports = { list, getById, create, update, deleteCustomer };

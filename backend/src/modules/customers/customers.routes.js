@@ -3,7 +3,8 @@
 
 const { Router } = require('express');
 const controller = require('./customers.controller');
-const { authenticate } = require('../../common/middlewares/auth');
+const { authenticate, authorize } = require('../../common/middlewares/auth');
+const { ROLES } = require('../../common/constants');
 
 const router = Router();
 
@@ -13,5 +14,9 @@ router.get('/', controller.list);
 router.get('/:id', controller.getById);
 router.post('/', controller.create);
 router.put('/:id', controller.update);
+// Hapus dibatasi manager saja - lebih sensitif dari sekadar edit data (mis. resiko kehilangan
+// riwayat pelanggan), beda dengan create/update yang tetap terbuka untuk semua role login
+// (mis. kasir input pelanggan baru saat transaksi POS).
+router.delete('/:id', authorize(ROLES.MANAGER), controller.deleteCustomer);
 
 module.exports = router;

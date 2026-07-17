@@ -51,6 +51,17 @@ export default function CustomersPage() {
   const closeModal = () => setModalCustomer(null);
   const closeDetail = () => setDetailCustomer(null);
 
+  const handleDelete = async (customer, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Hapus customer "${customer.name}"?`)) return;
+    try {
+      await customersService.deleteCustomer(customer.customerId);
+      reload();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'Gagal menghapus customer');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -85,9 +96,14 @@ export default function CustomersPage() {
       key: 'actions',
       label: '',
       render: (r) => (
-        <button type="button" className="btn btn-sm" onClick={(e) => openEdit(r, e)}>
-          Edit
-        </button>
+        <div className="btn-group">
+          <button type="button" className="btn btn-sm" onClick={(e) => openEdit(r, e)}>
+            Edit
+          </button>
+          <button type="button" className="btn btn-sm" onClick={(e) => handleDelete(r, e)}>
+            Hapus
+          </button>
+        </div>
       ),
     },
   ];
