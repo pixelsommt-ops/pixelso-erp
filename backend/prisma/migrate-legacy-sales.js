@@ -161,8 +161,17 @@ async function main() {
   }
 
   // ---------- tb_jual -> Payment (skip yang belum dibayar sama sekali) ----------
+  // Payment TIDAK punya unique constraint alami (beda dari ProductionOrder/SalesPos yang key
+  // di poNumber/poId) - skipDuplicates di createMany jadi no-op total. Idempotency dijaga manual
+  // sama seperti pola PoDetail di bawah: saleId yang SUDAH punya Payment (dari run sebelumnya)
+  // dilewati seluruhnya, supaya run ulang tidak menggandakan baris pembayaran.
+  const saleIdsWithExistingPayment = new Set(
+    (await prisma.payment.findMany({ where: { saleId: { in: [...poIdToSaleId.values()] } }, select: { saleId: true }, distinct: ['saleId'] }))
+      .map((p) => p.saleId)
+  );
   const paymentData = jualRows
-    .filter((r) => poNumberToId.has(r.idjual) && poIdToSaleId.has(poNumberToId.get(r.idjual)) && Number(r.bayar) > 0)
+    .filter((r) => poNumberToId.has(r.idjual) && poIdToSaleId.has(poNumberToId.get(r.idjual)) && Number(r.bayar) > 0
+      && !saleIdsWithExistingPayment.has(poIdToSaleId.get(poNumberToId.get(r.idjual))))
     .map((r) => {
       const createdAt = new Date(`${r.tanggal}T${r.jam || '00:00:00'}`);
       const paidAt = Number.isNaN(createdAt.getTime()) ? new Date(r.tanggal) : createdAt;
