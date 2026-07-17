@@ -578,6 +578,63 @@ input:focus, select:focus, textarea:focus {
   background: var(--color-primary);
 }
 
+.sidebar-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-group-toggle:hover {
+  background: var(--color-bg);
+}
+
+.sidebar-group-chevron {
+  transition: transform 0.15s ease;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar-group-chevron-open {
+  transform: rotate(90deg);
+}
+
+.sidebar-submenu {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0 0 0 0.9rem;
+}
+
+.sidebar-submenu li {
+  margin-bottom: 0.2rem;
+}
+
+.sidebar-submenu-link {
+  display: block;
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+}
+
+.sidebar-submenu-link:hover {
+  background: var(--color-bg);
+}
+
+.sidebar-submenu-link-active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
 .sidebar-backdrop {
   display: none;
 }

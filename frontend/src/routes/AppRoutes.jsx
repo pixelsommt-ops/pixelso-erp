@@ -19,6 +19,10 @@ import PricingPage from '../pages/pricing';
 import SettingsPage from '../pages/settings';
 import PromoPage from '../pages/promo';
 import ThemePage from '../pages/theme';
+import PositionsPage from '../pages/hrm/positions';
+import ContractsPage from '../pages/hrm/contracts';
+import AttendancePage from '../pages/hrm/attendance';
+import ShiftsPage from '../pages/hrm/shifts';
 
 export default function AppRoutes() {
   return (
@@ -43,6 +47,10 @@ export default function AppRoutes() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/promo" element={<PromoPage />} />
           <Route path="/theme" element={<ThemePage />} />
+          <Route path="/hrm/positions" element={<PositionsPage />} />
+          <Route path="/hrm/contracts" element={<ContractsPage />} />
+          <Route path="/hrm/attendance" element={<AttendancePage />} />
+          <Route path="/hrm/shifts" element={<ShiftsPage />} />
         </Route>
       </Route>
 

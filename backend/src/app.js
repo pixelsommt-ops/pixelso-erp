@@ -35,6 +35,11 @@ const cashAccountRoutes = require('./modules/cashAccount/cashAccount.routes');
 const expenseRoutes = require('./modules/expense/expense.routes');
 const purchasingRoutes = require('./modules/purchasing/purchasing.routes');
 const assetRoutes = require('./modules/asset/asset.routes');
+const positionRoutes = require('./modules/position/position.routes');
+const contractRoutes = require('./modules/contract/contract.routes');
+const shiftRoutes = require('./modules/shift/shift.routes');
+const shiftAssignmentRoutes = require('./modules/shift/shiftAssignment.routes');
+const attendanceRoutes = require('./modules/attendance/attendance.routes');
 
 const app = express();
 
@@ -109,6 +114,12 @@ app.use('/api/cash-accounts', cashAccountRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/purchasing', purchasingRoutes);
 app.use('/api/assets', assetRoutes);
+// HRM & Payroll - Fase 1: Personalia (Core HR)
+app.use('/api/positions', positionRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/shifts', shiftRoutes);
+app.use('/api/shift-assignments', shiftAssignmentRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

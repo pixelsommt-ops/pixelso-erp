@@ -54,6 +54,13 @@ model User {
   expenses          Expense[]
   purchaseOrders    PurchaseOrder[]
 
+  // NEW - Personalia (HRM & Payroll fase 1)
+  positionId       Int?                 @map("position_id")
+  position         Position?            @relation(fields: [positionId], references: [positionId])
+  contracts        EmploymentContract[]
+  shiftAssignments ShiftAssignment[]
+  attendances      Attendance[]
+
   @@map("users")
 }
 
@@ -620,4 +627,88 @@ model Asset {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("assets")
+}
+
+// ---------- HRM & Payroll - Fase 1: Personalia (Core HR) ----------
+
+model Position {
+  positionId Int      @id @default(autoincrement()) @map("position_id")
+  name       String
+  parentId   Int?     @map("parent_id") // atasan langsung (hierarki organisasi)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  parent   Position?  @relation("PositionHierarchy", fields: [parentId], references: [positionId])
+  children Position[] @relation("PositionHierarchy")
+  users    User[]
+
+  @@map("positions")
+}
+
+// Kontrak kerja - riwayat, bukan cuma status terkini (renewal PKWT nambah baris baru, bukan
+// overwrite). baseSalary sengaja disimpan di sini (bukan di User) - jadi input fase Payroll
+// berikutnya, dan wajar berubah tiap kontrak baru/diperpanjang.
+model EmploymentContract {
+  contractId   Int       @id @default(autoincrement()) @map("contract_id")
+  userId       Int       @map("user_id")
+  contractType String    @map("contract_type") // PKWT | PKWTT | Magang | Harian Lepas
+  startDate    DateTime  @map("start_date")
+  endDate      DateTime? @map("end_date") // null untuk PKWTT
+  baseSalary   Decimal   @map("base_salary") @db.Decimal(14, 2)
+  status       String    @default("active") // active | expired | terminated
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@map("employment_contracts")
+}
+
+// startTime/endTime String "HH:mm" (bukan DateTime) - jam berulang harian, bukan momen spesifik.
+model Shift {
+  shiftId   Int      @id @default(autoincrement()) @map("shift_id")
+  name      String
+  startTime String   @map("start_time")
+  endTime   String   @map("end_time")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  assignments ShiftAssignment[]
+
+  @@map("shifts")
+}
+
+model ShiftAssignment {
+  assignmentId Int      @id @default(autoincrement()) @map("assignment_id")
+  userId       Int      @map("user_id")
+  shiftId      Int      @map("shift_id")
+  date         DateTime @db.Date
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [userId])
+  shift Shift @relation(fields: [shiftId], references: [shiftId])
+
+  @@unique([userId, date])
+  @@map("shift_assignments")
+}
+
+// Absen manual dari ERP (belum ada mesin fisik) - source disiapkan utk integrasi mesin/GPS nanti
+// tanpa perlu redesain skema, tinggal nambah jalur import yang isi source='machine'/'gps'.
+model Attendance {
+  attendanceId Int       @id @default(autoincrement()) @map("attendance_id")
+  userId       Int       @map("user_id")
+  date         DateTime  @db.Date
+  checkInAt    DateTime? @map("check_in_at")
+  checkOutAt   DateTime? @map("check_out_at")
+  checkInLat   Decimal?  @map("check_in_lat") @db.Decimal(10, 7)
+  checkInLng   Decimal?  @map("check_in_lng") @db.Decimal(10, 7)
+  checkOutLat  Decimal?  @map("check_out_lat") @db.Decimal(10, 7)
+  checkOutLng  Decimal?  @map("check_out_lng") @db.Decimal(10, 7)
+  status       String    @default("present") // present | late | absent | leave | sick
+  source       String    @default("manual") // manual | machine | gps
+  notes        String?   @db.Text
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@unique([userId, date])
+  @@map("attendances")
 }
