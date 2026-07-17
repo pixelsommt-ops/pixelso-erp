@@ -15,6 +15,10 @@ import { PO_STATUS_OPTIONS, PO_STATUS_TRANSITIONS } from '../../utils/poStatusFl
 const EMPTY_ITEM = { productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '' };
 const EMPTY_FORM = { customerId: '', designerId: '', priority: 0, dueAt: '', notes: '', poDetails: [{ ...EMPTY_ITEM }] };
 
+// Ukuran di bawah ini kemungkinan besar salah ketik (mis. "100" ketulis "1") - bukan batas keras,
+// cuma dikonfirmasi ulang ke staf karena produk mode area (DTF dsb) kadang memang kecil.
+const SMALL_DIMENSION_WARNING_CM = 10;
+
 export default function ProductionOrdersPage() {
   const { hasRole, role } = useAuth();
   const canCreate = hasRole('designer', 'manager');
@@ -103,6 +107,23 @@ export default function ProductionOrdersPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const suspiciouslySmall = form.poDetails.filter((item) => {
+      if (!isAreaProduct(item.productId)) return false;
+      const width = Number(item.widthCm);
+      const height = Number(item.heightCm);
+      return (width > 0 && width < SMALL_DIMENSION_WARNING_CM) || (height > 0 && height < SMALL_DIMENSION_WARNING_CM);
+    });
+    if (suspiciouslySmall.length > 0) {
+      const lines = suspiciouslySmall
+        .map((item) => `- ${productMap[item.productId]?.name}: ${item.widthCm} x ${item.heightCm} cm`)
+        .join('\n');
+      const confirmed = window.confirm(
+        `Ukuran berikut terlihat sangat kecil, kemungkinan salah ketik (mis. "100" tertulis "1"):\n\n${lines}\n\nLanjutkan simpan PO dengan ukuran ini?`
+      );
+      if (!confirmed) return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
