@@ -28,6 +28,9 @@ const NAV_ITEMS = [
       { to: '/hrm/contracts', label: 'Kontrak Kerja', roles: ['hrd', 'manager'] },
       { to: '/hrm/attendance', label: 'Kehadiran', roles: null },
       { to: '/hrm/shifts', label: 'Manajemen Shift', roles: null },
+      // Backend payroll.routes.js membatasi seluruh router ke HRD/manager - data gaji + potongan
+      // pajak tiap karyawan, paling sensitif dari semua data di ERP ini.
+      { to: '/hrm/payroll', label: 'Payroll', roles: ['hrd', 'manager'] },
     ],
   },
   { to: '/customers', label: 'Customer & CRM', roles: null },

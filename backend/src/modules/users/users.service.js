@@ -15,6 +15,11 @@ const SAFE_SELECT = {
   createdAt: true,
   role: { select: { roleId: true, roleName: true } },
   team: { select: { teamId: true, name: true } },
+  // NEW - Personalia/Payroll (HRM & Payroll fase 1-2)
+  positionId: true,
+  maritalStatus: true,
+  dependentsCount: true,
+  position: { select: { positionId: true, name: true } },
 };
 
 async function list(query) {
@@ -46,7 +51,7 @@ async function getById(id) {
 }
 
 async function create(data) {
-  const { name, email, password, roleId, teamId, status } = data;
+  const { name, email, password, roleId, teamId, status, positionId, maritalStatus, dependentsCount } = data;
 
   if (!name || !email || !password || !roleId) {
     throw new ApiError(400, 'name, email, password, and roleId are required');
@@ -55,6 +60,13 @@ async function create(data) {
   const role = await prisma.role.findUnique({ where: { roleId: Number(roleId) } });
   if (!role) {
     throw new ApiError(400, 'Invalid roleId');
+  }
+
+  if (positionId) {
+    const position = await prisma.position.findUnique({ where: { positionId: Number(positionId) } });
+    if (!position) {
+      throw new ApiError(400, 'Invalid positionId');
+    }
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -72,13 +84,16 @@ async function create(data) {
       roleId: Number(roleId),
       teamId: teamId ? Number(teamId) : undefined,
       status: status || 'active',
+      positionId: positionId ? Number(positionId) : undefined,
+      maritalStatus: maritalStatus === 'K' ? 'K' : 'TK',
+      dependentsCount: dependentsCount !== undefined ? Number(dependentsCount) : undefined,
     },
     select: SAFE_SELECT,
   });
 }
 
 async function update(id, data) {
-  const { name, email, password, roleId, teamId, status } = data;
+  const { name, email, password, roleId, teamId, status, positionId, maritalStatus, dependentsCount } = data;
 
   const user = await prisma.user.findUnique({ where: { userId: Number(id) } });
   if (!user) {
@@ -99,6 +114,17 @@ async function update(id, data) {
     }
   }
 
+  if (positionId) {
+    const position = await prisma.position.findUnique({ where: { positionId: Number(positionId) } });
+    if (!position) {
+      throw new ApiError(400, 'Invalid positionId');
+    }
+  }
+
+  if (maritalStatus !== undefined && !['TK', 'K'].includes(maritalStatus)) {
+    throw new ApiError(400, "maritalStatus must be 'TK' or 'K'");
+  }
+
   return prisma.user.update({
     where: { userId: Number(id) },
     data: {
@@ -108,6 +134,9 @@ async function update(id, data) {
       ...(roleId ? { roleId: Number(roleId) } : {}),
       ...(teamId !== undefined ? { teamId: teamId ? Number(teamId) : null } : {}),
       ...(status ? { status } : {}),
+      ...(positionId !== undefined ? { positionId: positionId ? Number(positionId) : null } : {}),
+      ...(maritalStatus !== undefined ? { maritalStatus } : {}),
+      ...(dependentsCount !== undefined ? { dependentsCount: Number(dependentsCount) } : {}),
     },
     select: SAFE_SELECT,
   });

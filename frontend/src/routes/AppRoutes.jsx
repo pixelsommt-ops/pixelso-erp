@@ -23,6 +23,7 @@ import PositionsPage from '../pages/hrm/positions';
 import ContractsPage from '../pages/hrm/contracts';
 import AttendancePage from '../pages/hrm/attendance';
 import ShiftsPage from '../pages/hrm/shifts';
+import PayrollPage from '../pages/hrm/payroll';
 
 export default function AppRoutes() {
   return (
@@ -51,6 +52,7 @@ export default function AppRoutes() {
           <Route path="/hrm/contracts" element={<ContractsPage />} />
           <Route path="/hrm/attendance" element={<AttendancePage />} />
           <Route path="/hrm/shifts" element={<ShiftsPage />} />
+          <Route path="/hrm/payroll" element={<PayrollPage />} />
         </Route>
       </Route>
 

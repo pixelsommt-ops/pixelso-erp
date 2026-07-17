@@ -61,6 +61,14 @@ model User {
   shiftAssignments ShiftAssignment[]
   attendances      Attendance[]
 
+  // NEW - Payroll & Benefit (HRM & Payroll fase 2) - status PTKP, dipakai resolveTerCategory()
+  // di payroll.calculator.js buat nentuin kategori tarif TER PPh21. Independen dari siklus
+  // kontrak (bisa berubah kapan saja - nikah, tambah anak), makanya bukan di EmploymentContract.
+  maritalStatus   String @default("TK") @map("marital_status") // TK (tidak kawin) | K (kawin)
+  dependentsCount Int    @default(0) @map("dependents_count") // 0-3
+  payrollRunsCreated PayrollRun[]
+  payrollItems       PayrollItem[]
+
   @@map("users")
 }
 
@@ -711,4 +719,50 @@ model Attendance {
 
   @@unique([userId, date])
   @@map("attendances")
+}
+
+// ---------- HRM & Payroll - Fase 2: Payroll & Benefit ----------
+// PERINGATAN: tarif PPh21 (TER)/BPJS dipakai di payroll.calculator.js, bukan di sini - lihat
+// komentar peringatan lengkap di file itu sebelum menganggap angka payroll akurat/final.
+
+model PayrollRun {
+  payrollRunId Int       @id @default(autoincrement()) @map("payroll_run_id")
+  period       String    @unique // 'YYYY-MM'
+  status       String    @default("draft") // draft | finalized
+  createdBy    Int       @map("created_by")
+  finalizedAt  DateTime? @map("finalized_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  creator User          @relation(fields: [createdBy], references: [userId])
+  items   PayrollItem[]
+
+  @@map("payroll_runs")
+}
+
+// Satu baris per karyawan per periode. baseSalary di-snapshot dari EmploymentContract aktif saat
+// run dibuat (bukan live-reference ke Contract) - supaya histori payroll stabil walau gaji pokok
+// berubah belakangan (kenaikan gaji, kontrak baru, dst).
+model PayrollItem {
+  payrollItemId Int     @id @default(autoincrement()) @map("payroll_item_id")
+  payrollRunId  Int     @map("payroll_run_id")
+  userId        Int     @map("user_id")
+  baseSalary    Decimal @map("base_salary") @db.Decimal(14, 2)
+  overtimeHours Decimal @default(0) @map("overtime_hours") @db.Decimal(6, 2) // input manual HRD
+  overtimePay   Decimal @default(0) @map("overtime_pay") @db.Decimal(14, 2)
+  incentive     Decimal @default(0) @map("incentive") @db.Decimal(14, 2) // input manual HRD
+  grossPay      Decimal @default(0) @map("gross_pay") @db.Decimal(14, 2)
+  pph21         Decimal @default(0) @map("pph21") @db.Decimal(14, 2)
+  bpjsKesehatanEmployee       Decimal @default(0) @map("bpjs_kesehatan_employee") @db.Decimal(14, 2)
+  bpjsKetenagakerjaanEmployee Decimal @default(0) @map("bpjs_ketenagakerjaan_employee") @db.Decimal(14, 2)
+  totalDeductions Decimal @default(0) @map("total_deductions") @db.Decimal(14, 2)
+  netPay          Decimal @default(0) @map("net_pay") @db.Decimal(14, 2) // take-home
+  // Informational - biaya perusahaan, TIDAK dipotong dari netPay karyawan.
+  bpjsKesehatanEmployer       Decimal @default(0) @map("bpjs_kesehatan_employer") @db.Decimal(14, 2)
+  bpjsKetenagakerjaanEmployer Decimal @default(0) @map("bpjs_ketenagakerjaan_employer") @db.Decimal(14, 2)
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [payrollRunId], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [userId])
+
+  @@unique([payrollRunId, userId])
+  @@map("payroll_items")
 }

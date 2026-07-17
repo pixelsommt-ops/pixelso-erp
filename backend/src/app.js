@@ -40,6 +40,7 @@ const contractRoutes = require('./modules/contract/contract.routes');
 const shiftRoutes = require('./modules/shift/shift.routes');
 const shiftAssignmentRoutes = require('./modules/shift/shiftAssignment.routes');
 const attendanceRoutes = require('./modules/attendance/attendance.routes');
+const payrollRoutes = require('./modules/payroll/payroll.routes');
 
 const app = express();
 
@@ -120,6 +121,7 @@ app.use('/api/contracts', contractRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/shift-assignments', shiftAssignmentRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/payroll', payrollRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

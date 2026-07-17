@@ -1,12 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import * as usersService from '../../services/usersService';
+import * as positionService from '../../services/positionService';
 import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import { formatDate } from '../../utils/format';
 
-const EMPTY_FORM = { name: '', email: '', password: '', roleId: '', teamId: '', status: 'active' };
+const EMPTY_FORM = {
+  name: '', email: '', password: '', roleId: '', teamId: '', status: 'active',
+  positionId: '', maritalStatus: 'TK', dependentsCount: 0,
+};
 
 export default function UsersPage() {
   const [tab, setTab] = useState('users');
@@ -51,6 +55,10 @@ function UsersTab() {
   const { data: teams } = useFetch(fetchTeams, [fetchTeams]);
   const teamOptions = useMemo(() => teams || [], [teams]);
 
+  const fetchPositions = useCallback(() => positionService.list(), []);
+  const { data: positions } = useFetch(fetchPositions, [fetchPositions]);
+  const positionOptions = useMemo(() => positions || [], [positions]);
+
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setFormError('');
@@ -65,6 +73,9 @@ function UsersTab() {
       roleId: String(user.roleId),
       teamId: user.teamId ? String(user.teamId) : '',
       status: user.status,
+      positionId: user.positionId ? String(user.positionId) : '',
+      maritalStatus: user.maritalStatus || 'TK',
+      dependentsCount: user.dependentsCount ?? 0,
     });
     setFormError('');
     setModalUser(user);
@@ -81,6 +92,8 @@ function UsersTab() {
         ...form,
         roleId: Number(form.roleId),
         teamId: form.teamId ? Number(form.teamId) : null,
+        positionId: form.positionId ? Number(form.positionId) : null,
+        dependentsCount: Number(form.dependentsCount) || 0,
       };
       if (modalUser?.userId) {
         if (!payload.password) delete payload.password;
@@ -107,6 +120,7 @@ function UsersTab() {
     { key: 'email', label: 'Email' },
     { key: 'role', label: 'Role', render: (r) => <StatusBadge status={r.role?.roleName} /> },
     { key: 'team', label: 'Tim', render: (r) => r.team?.name || '-' },
+    { key: 'position', label: 'Jabatan', render: (r) => r.position?.name || '-' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'createdAt', label: 'Bergabung', render: (r) => formatDate(r.createdAt) },
     {
@@ -215,6 +229,32 @@ function UsersTab() {
                   <option value="active">active</option>
                   <option value="inactive">inactive</option>
                 </select>
+              </div>
+              <div className="form-group full">
+                <label>Jabatan</label>
+                <select value={form.positionId} onChange={(e) => setForm({ ...form, positionId: e.target.value })}>
+                  <option value="">- tanpa jabatan -</option>
+                  {positionOptions.map((p) => (
+                    <option key={p.positionId} value={p.positionId}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Status Kawin (PPh21)</label>
+                <select value={form.maritalStatus} onChange={(e) => setForm({ ...form, maritalStatus: e.target.value })}>
+                  <option value="TK">TK - Tidak Kawin</option>
+                  <option value="K">K - Kawin</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Jumlah Tanggungan (PPh21)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="3"
+                  value={form.dependentsCount}
+                  onChange={(e) => setForm({ ...form, dependentsCount: e.target.value })}
+                />
               </div>
             </div>
             <div className="btn-group" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
