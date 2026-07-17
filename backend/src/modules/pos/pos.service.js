@@ -27,6 +27,72 @@ function paidStatusFor(total, paidSoFar) {
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
+// DP minimal supaya transaksi bisa lanjut - kasir pakai popup "Buat Invoice" untuk cek ini
+// sebelum submit, tapi tetap ditegakkan di sini juga (server adalah sumber kebenaran).
+const MIN_DP_RATIO = 0.5;
+
+async function getCalcTypeByPricingModeKey() {
+  const pricingModes = await prisma.pricingMode.findMany();
+  return new Map(pricingModes.map((m) => [m.key, m.calcType]));
+}
+
+// Mode area (mis. Banner MMT, "Per m2") harus dikali luas (lebar x tinggi dalam cm -> m2),
+// sama seperti production-orders.service.js#create. Dipakai bareng oleh getQuote() (preview
+// di popup Buat Invoice) dan create() (perhitungan final) supaya rumusnya tidak dobel-tulis.
+function quoteItemsFor(poDetails, calcTypeByKey) {
+  return poDetails.map((detail) => {
+    const calcType = calcTypeByKey.get(detail.product.pricingMode) || 'scalar';
+    const unitPrice = Number(detail.product.basePrice);
+    let areaM2 = null;
+    let lineTotal;
+    if (calcType === 'area') {
+      areaM2 = (Number(detail.widthCm) / 100) * (Number(detail.heightCm) / 100);
+      lineTotal = areaM2 * detail.qty * unitPrice;
+    } else {
+      lineTotal = unitPrice * detail.qty;
+    }
+    return {
+      poDetailId: detail.poDetailId,
+      productName: detail.product.name,
+      qty: detail.qty,
+      size: detail.size,
+      calcType,
+      areaM2,
+      unitPrice,
+      lineTotal,
+    };
+  });
+}
+
+// Preview invoice untuk popup "Buat Invoice" - dipanggil begitu kasir memilih PO, supaya bisa
+// dicek rincian item, subtotal, dan berapa DP minimal (MIN_DP_RATIO) sebelum submit.
+async function getQuote(poId) {
+  const order = await prisma.productionOrder.findUnique({
+    where: { poId: Number(poId) },
+    include: {
+      poDetails: { include: { product: true } },
+      customer: { select: { customerId: true, name: true, phone: true, segment: true } },
+    },
+  });
+  if (!order) {
+    throw new ApiError(400, 'Invalid poId');
+  }
+
+  const calcTypeByKey = await getCalcTypeByPricingModeKey();
+  const items = quoteItemsFor(order.poDetails, calcTypeByKey);
+  const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+
+  return {
+    poId: order.poId,
+    poNumber: order.poNumber,
+    status: order.status,
+    customer: order.customer,
+    items,
+    subtotal,
+    minDpRatio: MIN_DP_RATIO,
+  };
+}
+
 async function list(query) {
   const { paidStatus, poId, cashierId, dateFrom, dateTo, page, pageSize } = query;
 
@@ -92,24 +158,21 @@ async function create(data, currentUser) {
     throw new ApiError(400, `Production order must be in '${PO_STATUS.APPROVED}' status before invoicing (currently '${order.status}')`);
   }
 
-  // Mode area (mis. Banner MMT, "Per m2") harus dikali luas (lebar x tinggi dalam cm -> m2),
-  // sama seperti production-orders.service.js#create - dulu di sini selalu flat basePrice x qty.
-  const pricingModes = await prisma.pricingMode.findMany();
-  const calcTypeByKey = new Map(pricingModes.map((m) => [m.key, m.calcType]));
+  const calcTypeByKey = await getCalcTypeByPricingModeKey();
+  const subtotal = quoteItemsFor(order.poDetails, calcTypeByKey).reduce((sum, item) => sum + item.lineTotal, 0);
 
-  const subtotal = order.poDetails.reduce((sum, detail) => {
-    const calcType = calcTypeByKey.get(detail.product.pricingMode) || 'scalar';
-    const price = Number(detail.product.basePrice);
-    if (calcType === 'area') {
-      const areaM2 = (Number(detail.widthCm) / 100) * (Number(detail.heightCm) / 100);
-      return sum + areaM2 * detail.qty * price;
-    }
-    return sum + price * detail.qty;
-  }, 0);
   const total = Math.max(subtotal - (discount ? Number(discount) : 0), 0);
   const dpAmount = dp ? Number(dp) : 0;
   if (dpAmount > total) {
     throw new ApiError(400, 'dp cannot exceed total');
+  }
+  // Transaksi tidak boleh lanjut kalau DP kurang dari 50% total - lihat MIN_DP_RATIO.
+  const minDp = Math.ceil(total * MIN_DP_RATIO);
+  if (total > 0 && dpAmount < minDp) {
+    throw new ApiError(
+      400,
+      `DP minimal 50% dari total transaksi (Rp${minDp.toLocaleString('id-ID')}) sebelum invoice bisa dibuat`
+    );
   }
   if (dpAmount > 0 && !paymentMethod) {
     throw new ApiError(400, 'paymentMethod is required when dp > 0');
@@ -233,4 +296,4 @@ async function confirmPayment(saleId, paymentId, action, currentUser) {
   });
 }
 
-module.exports = { list, getById, create, update, confirmPayment };
+module.exports = { list, getById, getQuote, create, update, confirmPayment };

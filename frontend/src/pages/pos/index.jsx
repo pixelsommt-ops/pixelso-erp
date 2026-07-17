@@ -29,6 +29,8 @@ export default function PosPage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [approvedOrders, setApprovedOrders] = useState([]);
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
 
   const [detail, setDetail] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash' });
@@ -55,11 +57,46 @@ export default function PosPage() {
   const openCreate = async () => {
     setForm(EMPTY_FORM);
     setFormError('');
+    setQuote(null);
     const res = await productionOrdersService.list({ status: 'approved', pageSize: 200 });
     setApprovedOrders(res.data.orders);
     setCreateOpen(true);
   };
-  const closeCreate = () => setCreateOpen(false);
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setQuote(null);
+  };
+
+  // Begitu kasir pilih PO di popup Buat Invoice, tarik rincian item + subtotalnya supaya bisa
+  // dicek dulu (harga per item, apakah pantas dapat diskon) sebelum invoice benar-benar dibuat.
+  useEffect(() => {
+    if (!createOpen || !form.poId) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    posService
+      .getQuote(form.poId)
+      .then((res) => {
+        if (!cancelled) setQuote(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setQuote(null);
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [createOpen, form.poId]);
+
+  const subtotal = quote?.subtotal ? Number(quote.subtotal) : 0;
+  const totalAfterDiscount = Math.max(subtotal - (Number(form.discount) || 0), 0);
+  const minDp = Math.ceil(totalAfterDiscount * (quote?.minDpRatio ?? 0.5));
+  const dpAmount = Number(form.dp) || 0;
+  const dpShortfall = quote && totalAfterDiscount > 0 && dpAmount < minDp;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -230,6 +267,46 @@ export default function PosPage() {
                   ))}
                 </select>
               </div>
+              {quoteLoading && <div className="form-group full text-muted text-sm">Memuat rincian invoice...</div>}
+
+              {quote && !quoteLoading && (
+                <div className="form-group full">
+                  <label>Rincian Invoice</label>
+                  <div className="text-sm" style={{ marginBottom: 4 }}>
+                    <strong>{quote.customer?.name}</strong>
+                    {quote.customer?.segment ? ` (${quote.customer.segment})` : ''}
+                    {quote.customer?.phone ? ` - ${quote.customer.phone}` : ''}
+                  </div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Produk</th>
+                          <th>Ukuran/Qty</th>
+                          <th>Harga</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {quote.items.map((item) => (
+                          <tr key={item.poDetailId}>
+                            <td>{item.productName}</td>
+                            <td>
+                              {item.calcType === 'area'
+                                ? `${item.size || ''} x${item.qty} (${item.areaM2?.toFixed(2)} m²)`
+                                : `x${item.qty}`}
+                            </td>
+                            <td>{formatCurrency(item.lineTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-sm" style={{ marginTop: 6 }}>
+                    Subtotal: <strong>{formatCurrency(subtotal)}</strong>
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Diskon</label>
                 <input
@@ -239,10 +316,24 @@ export default function PosPage() {
                   onChange={(e) => setForm({ ...form, discount: e.target.value })}
                 />
               </div>
+
+              {quote && (
+                <div className="form-group full text-sm">
+                  Total setelah diskon: <strong>{formatCurrency(totalAfterDiscount)}</strong>
+                  {' - '}DP minimal 50%: <strong>{formatCurrency(minDp)}</strong>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>DP (uang muka)</label>
                 <input type="number" min="0" value={form.dp} onChange={(e) => setForm({ ...form, dp: e.target.value })} />
               </div>
+              {dpShortfall && (
+                <div className="form-group full alert alert-error">
+                  DP kurang dari 50% total. Minimal {formatCurrency(minDp)}, kurang {formatCurrency(minDp - dpAmount)}.
+                  Pelanggan belum bisa melanjutkan transaksi.
+                </div>
+              )}
               {Number(form.dp) > 0 && (
                 <div className="form-group full">
                   <label>Metode Pembayaran DP</label>
@@ -262,7 +353,7 @@ export default function PosPage() {
               <button type="button" className="btn" onClick={closeCreate}>
                 Batal
               </button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
+              <button type="submit" className="btn btn-primary" disabled={submitting || dpShortfall}>
                 {submitting ? 'Menyimpan...' : 'Buat Invoice'}
               </button>
             </div>

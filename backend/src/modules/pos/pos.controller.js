@@ -13,6 +13,11 @@ const getById = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const getQuote = asyncHandler(async (req, res) => {
+  const data = await service.getQuote(req.params.poId);
+  res.json({ success: true, data });
+});
+
 const create = asyncHandler(async (req, res) => {
   const data = await service.create(req.body, req.user);
   res.status(201).json({ success: true, data });
@@ -28,4 +33,4 @@ const confirmPayment = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update, confirmPayment };
+module.exports = { list, getById, getQuote, create, update, confirmPayment };

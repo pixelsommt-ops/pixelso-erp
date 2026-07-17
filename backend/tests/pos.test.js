@@ -25,11 +25,30 @@ describe('POS & Payments', () => {
       .send({ status: 'approved' });
   });
 
-  test('creating invoice computes total from qty * basePrice', async () => {
+  test('quote previews items and subtotal before the invoice is created', async () => {
+    const res = await request(app)
+      .get(`/api/pos/quote/${approvedPoId}`)
+      .set('Authorization', `Bearer ${cashierToken}`);
+    expect(res.status).toBe(200);
+    expect(Number(res.body.data.subtotal)).toBe(100000); // 2 x 50000
+    expect(res.body.data.items).toHaveLength(1);
+    expect(res.body.data.minDpRatio).toBe(0.5);
+  });
+
+  test('dp below 50% of total is rejected', async () => {
     const res = await request(app)
       .post('/api/pos')
       .set('Authorization', `Bearer ${cashierToken}`)
       .send({ poId: approvedPoId, dp: 20000, paymentMethod: 'cash' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/DP minimal 50%/);
+  });
+
+  test('creating invoice computes total from qty * basePrice', async () => {
+    const res = await request(app)
+      .post('/api/pos')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ poId: approvedPoId, dp: 50000, paymentMethod: 'cash' });
     expect(res.status).toBe(201);
     expect(Number(res.body.data.total)).toBe(100000); // 2 x 50000
     expect(res.body.data.paidStatus).toBe('partial');
@@ -61,7 +80,7 @@ describe('POS & Payments', () => {
     const res = await request(app)
       .put(`/api/pos/${sale.saleId}`)
       .set('Authorization', `Bearer ${cashierToken}`)
-      .send({ payment: { amount: 80000, method: 'transfer' } });
+      .send({ payment: { amount: 50000, method: 'transfer' } });
     expect(res.status).toBe(200);
     expect(res.body.data.paidStatus).toBe('paid');
   });

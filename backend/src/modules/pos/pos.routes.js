@@ -11,6 +11,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', controller.list);
+router.get('/quote/:poId', authorize(ROLES.CASHIER, ROLES.MANAGER), controller.getQuote);
 router.get('/:id', controller.getById);
 router.post('/', authorize(ROLES.CASHIER, ROLES.MANAGER), controller.create);
 router.put('/:id', authorize(ROLES.CASHIER, ROLES.MANAGER, ROLES.FINANCE), controller.update);
