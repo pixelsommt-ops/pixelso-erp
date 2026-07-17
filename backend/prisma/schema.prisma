@@ -121,6 +121,23 @@ model SiteSettings {
   @@map("site_settings")
 }
 
+// Tema event storefront (Kemerdekaan, Idul Fitri, dsb) - manager buat beberapa tema di muka,
+// aktifkan salah satu kapan perlu (manual, bukan terjadwal). Cuma satu boleh isActive:true,
+// dijaga di theme.service.js#activate() lewat transaction, bukan constraint DB.
+model Theme {
+  themeId    Int      @id @default(autoincrement()) @map("theme_id")
+  name       String
+  isActive   Boolean  @default(false) @map("is_active")
+  colors     Json? // { "--maroon-950": "#2a0710", ... } subset dari CSS var index.css storefront yang boleh dioverride
+  logoUrl    String?  @map("logo_url")
+  heroSlides Json?    @map("hero_slides") // array {url, linkUrl} - override SiteSettings.heroSlides selama tema ini aktif; kosong/null = pakai hero normal
+  customCss  String?  @map("custom_css") @db.Text // disuntik manager, dipercaya sama seperti akses master-data lain (bukan input publik)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("themes")
+}
+
 // ---------- Harga website publik (satu-satunya sumber untuk kalkulator landing page) ----------
 // Bentuknya mengikuti data/config.json (pricing) di app pixelso_nodejs - lihat ERP_INTEGRATION.md di app itu.
 

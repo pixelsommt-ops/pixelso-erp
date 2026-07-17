@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { to: '/pricing', label: 'Harga Website (Kalkulator)', roles: ['manager'] },
   { to: '/settings', label: 'Halaman Depan (Website)', roles: ['manager'] },
   { to: '/promo', label: 'Promo', roles: ['manager'] },
+  { to: '/theme', label: 'Tema Website', roles: ['manager'] },
 ];
 
 export default function Sidebar({ open, onClose }) {

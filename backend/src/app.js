@@ -30,6 +30,7 @@ const promoRoutes = require('./modules/promo/promo.routes');
 const categoryRoutes = require('./modules/category/category.routes');
 const pricingModeRoutes = require('./modules/pricingMode/pricingMode.routes');
 const supplierRoutes = require('./modules/supplier/supplier.routes');
+const themeRoutes = require('./modules/theme/theme.routes');
 
 const app = express();
 
@@ -96,6 +97,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/pricing-modes', pricingModeRoutes);
 // Master Supplier - dikelola dari Master Produk, diisi awal dari migrasi data POS lama
 app.use('/api/suppliers', supplierRoutes);
+// Tema Website (event: Kemerdekaan, Idul Fitri, dst) - tema aktif dibaca storefront lewat
+// /api/storefront/settings (lihat storefront.service.js#getSiteSettings), bukan endpoint ini langsung
+app.use('/api/themes', themeRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

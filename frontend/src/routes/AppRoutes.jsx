@@ -18,6 +18,7 @@ import UsersPage from '../pages/users';
 import PricingPage from '../pages/pricing';
 import SettingsPage from '../pages/settings';
 import PromoPage from '../pages/promo';
+import ThemePage from '../pages/theme';
 
 export default function AppRoutes() {
   return (
@@ -41,6 +42,7 @@ export default function AppRoutes() {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/promo" element={<PromoPage />} />
+          <Route path="/theme" element={<ThemePage />} />
         </Route>
       </Route>
 

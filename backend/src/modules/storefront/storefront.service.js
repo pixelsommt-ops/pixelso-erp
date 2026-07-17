@@ -9,6 +9,7 @@ const { PO_STATUS } = require('../../common/constants');
 const pricingService = require('../pricing/pricing.service');
 const settingsService = require('../settings/settings.service');
 const promoService = require('../promo/promo.service');
+const themeService = require('../theme/theme.service');
 const { generatePoNumber } = require('../production-orders/production-orders.service');
 const { calculatePrintPrice } = require('./storefront.calculator');
 const { sendMail } = require('../../common/utils/mailer');
@@ -187,8 +188,14 @@ async function getCatalog() {
   return pricingService.getPublicPricing();
 }
 
+// Tema event (kalau ada yang aktif) ikut dikirim di sini, bukan endpoint terpisah - storefront
+// sudah panggil ini sekali di setiap load, lebih hemat daripada request tambahan.
 async function getSiteSettings() {
-  return settingsService.getPublicSettings();
+  const [settings, activeTheme] = await Promise.all([
+    settingsService.getPublicSettings(),
+    themeService.getActiveTheme(),
+  ]);
+  return { ...settings, activeTheme: activeTheme || null };
 }
 
 async function getPromos() {
