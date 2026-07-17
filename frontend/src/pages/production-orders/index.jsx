@@ -8,6 +8,7 @@ import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
+import SearchableSelect from '../../components/common/SearchableSelect';
 import StatusBadge from '../../components/common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { PO_STATUS_OPTIONS, PO_STATUS_TRANSITIONS } from '../../utils/poStatusFlow';
@@ -250,20 +251,16 @@ export default function ProductionOrdersPage() {
             <div className="form-grid">
               <div className="form-group">
                 <label>Customer</label>
-                <select
+                <SearchableSelect
                   required
+                  placeholder="Ketik nama customer..."
                   value={form.customerId}
-                  onChange={(e) => setForm({ ...form, customerId: e.target.value })}
-                >
-                  <option value="" disabled>
-                    Pilih customer
-                  </option>
-                  {customers.map((c) => (
-                    <option key={c.customerId} value={c.customerId}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(customerId) => setForm({ ...form, customerId })}
+                  options={customers.map((c) => ({
+                    value: c.customerId,
+                    label: c.phone ? `${c.name} — ${c.phone}` : c.name,
+                  }))}
+                />
               </div>
               {role === 'manager' && (
                 <div className="form-group">

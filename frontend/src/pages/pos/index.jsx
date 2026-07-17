@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as posService from '../../services/posService';
 import * as productionOrdersService from '../../services/productionOrdersService';
+import * as settingsService from '../../services/settingsService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
+import Receipt from '../../components/common/Receipt';
 import { formatCurrency, formatDateTime } from '../../utils/format';
 
 const EMPTY_FORM = { poId: '', discount: 0, dp: 0, paymentMethod: 'cash' };
@@ -36,6 +38,15 @@ export default function PosPage() {
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash' });
   const [actionError, setActionError] = useState('');
   const [actioning, setActioning] = useState(false);
+  const [siteSettings, setSiteSettings] = useState(null);
+
+  // Buat header nota cetak (nama/alamat/WA toko) - diambil sekali, dipakai tiap kali "Cetak Nota".
+  useEffect(() => {
+    settingsService
+      .getPublicSettings()
+      .then((res) => setSiteSettings(res.data))
+      .catch(() => setSiteSettings(null));
+  }, []);
 
   const fetchSales = useCallback(
     () =>
@@ -382,6 +393,36 @@ export default function PosPage() {
             </div>
           </div>
 
+          {detail.items && detail.items.length > 0 && (
+            <>
+              <h3 style={{ fontSize: '0.9rem' }}>Item</h3>
+              <div className="table-wrap" style={{ marginBottom: '1rem' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produk</th>
+                      <th>Ukuran/Qty</th>
+                      <th>Harga</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.items.map((item) => (
+                      <tr key={item.poDetailId}>
+                        <td>{item.productName}</td>
+                        <td>
+                          {item.calcType === 'area'
+                            ? `${item.size || ''} x${item.qty} (${item.areaM2?.toFixed(2)} m²)`
+                            : `x${item.qty}`}
+                        </td>
+                        <td>{formatCurrency(item.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
           <h3 style={{ fontSize: '0.9rem' }}>Riwayat Pembayaran</h3>
           <div className="table-wrap" style={{ marginBottom: '1rem' }}>
             <table>
@@ -482,13 +523,20 @@ export default function PosPage() {
             </form>
           )}
 
-          {detail.paidStatus !== 'void' && canVoid && (
-            <button type="button" className="btn btn-danger btn-sm" disabled={actioning} onClick={handleVoid}>
-              Void Invoice
+          <div className="btn-group">
+            <button type="button" className="btn btn-sm" onClick={() => window.print()}>
+              Cetak Nota
             </button>
-          )}
+            {detail.paidStatus !== 'void' && canVoid && (
+              <button type="button" className="btn btn-danger btn-sm" disabled={actioning} onClick={handleVoid}>
+                Void Invoice
+              </button>
+            )}
+          </div>
         </Modal>
       )}
+
+      <Receipt sale={detail} settings={siteSettings} remaining={remaining} />
     </div>
   );
 }

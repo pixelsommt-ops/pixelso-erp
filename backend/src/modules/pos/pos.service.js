@@ -125,12 +125,31 @@ async function list(query) {
   return { sales, total, page: currentPage, pageSize: take, totalPages: Math.max(1, Math.ceil(total / take)) };
 }
 
+// Include terpisah dari DETAIL_INCLUDE (yang dipakai list/create/update) - cuma dipakai di sini
+// supaya list yang dipaginasi tidak ikut menarik poDetails+product tiap baris tanpa perlu.
+const DETAIL_WITH_ITEMS_INCLUDE = {
+  ...DETAIL_INCLUDE,
+  productionOrder: {
+    select: {
+      poId: true,
+      poNumber: true,
+      status: true,
+      customer: { select: { customerId: true, name: true, phone: true } },
+      poDetails: { include: { product: true } },
+    },
+  },
+};
+
+// Rincian item dipakai buat tampilan detail invoice + nota cetak (lihat Print di frontend) -
+// dihitung ulang pakai rumus yang sama dengan create()/getQuote(), bukan disimpan permanen.
 async function getById(id) {
-  const sale = await prisma.salesPos.findUnique({ where: { saleId: Number(id) }, include: DETAIL_INCLUDE });
+  const sale = await prisma.salesPos.findUnique({ where: { saleId: Number(id) }, include: DETAIL_WITH_ITEMS_INCLUDE });
   if (!sale) {
     throw new ApiError(404, 'Sale not found');
   }
-  return sale;
+  const calcTypeByKey = await getCalcTypeByPricingModeKey();
+  const items = quoteItemsFor(sale.productionOrder.poDetails, calcTypeByKey);
+  return { ...sale, items };
 }
 
 async function create(data, currentUser) {
