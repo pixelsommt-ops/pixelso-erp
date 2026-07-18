@@ -29,7 +29,7 @@ async function login(email, password) {
 
   return {
     token,
-    user: { userId: user.userId, name: user.name, email: user.email, role: user.role.roleName },
+    user: { userId: user.userId, name: user.name, email: user.email, role: user.role.roleName, photoUrl: user.photoUrl },
   };
 }
 
@@ -38,7 +38,7 @@ async function me(userId) {
   if (!user) {
     throw new ApiError(404, 'User not found');
   }
-  return { userId: user.userId, name: user.name, email: user.email, role: user.role.roleName };
+  return { userId: user.userId, name: user.name, email: user.email, role: user.role.roleName, photoUrl: user.photoUrl };
 }
 
 module.exports = { login, me };

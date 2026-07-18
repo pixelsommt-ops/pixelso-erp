@@ -38,6 +38,7 @@ model User {
   teamId     Int?     @map("team_id")
   status     String   @default("active")
   isSystem   Boolean  @default(false) @map("is_system") // akun placeholder non-manusia (mis. checkout storefront)
+  photoUrl   String?  @map("photo_url")
   createdAt  DateTime @default(now()) @map("created_at")
 
   role Role  @relation(fields: [roleId], references: [roleId])

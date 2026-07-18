@@ -5,10 +5,11 @@ import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
+import { compressImage } from '../../utils/compressImage';
 import { formatDate } from '../../utils/format';
 
 const EMPTY_FORM = {
-  name: '', email: '', password: '', roleId: '', teamId: '', status: 'active',
+  name: '', email: '', password: '', roleId: '', teamId: '', status: 'active', photoUrl: '',
   positionId: '', maritalStatus: 'TK', dependentsCount: 0,
 };
 
@@ -40,6 +41,7 @@ function UsersTab() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const fetchUsers = useCallback(
     () => usersService.list({ search: search || undefined, roleId: roleFilter || undefined }),
@@ -73,6 +75,7 @@ function UsersTab() {
       roleId: String(user.roleId),
       teamId: user.teamId ? String(user.teamId) : '',
       status: user.status,
+      photoUrl: user.photoUrl || '',
       positionId: user.positionId ? String(user.positionId) : '',
       maritalStatus: user.maritalStatus || 'TK',
       dependentsCount: user.dependentsCount ?? 0,
@@ -83,9 +86,32 @@ function UsersTab() {
 
   const closeModal = () => setModalUser(null);
 
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFormError('');
+    setUploadingPhoto(true);
+    try {
+      const { dataUrl } = await compressImage(file, { maxWidth: 400, maxHeight: 400, targetBytes: 300000 });
+      const { data } = await usersService.uploadPhoto(dataUrl, file.name);
+      setForm((prev) => ({ ...prev, photoUrl: data.url }));
+    } catch (err) {
+      setFormError(err?.response?.data?.message || err?.message || 'Gagal mengunggah foto');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const removePhoto = () => setForm((prev) => ({ ...prev, photoUrl: '' }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+    if (uploadingPhoto) {
+      setFormError('Tunggu proses upload foto selesai dulu sebelum menyimpan.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -170,6 +196,38 @@ function UsersTab() {
           <form onSubmit={handleSubmit}>
             {formError && <div className="alert alert-error">{formError}</div>}
             <div className="form-grid">
+              <div className="form-group full">
+                <label>Foto Profil</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {form.photoUrl ? (
+                    <img
+                      src={form.photoUrl}
+                      alt="Foto profil"
+                      style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '56px', height: '56px', borderRadius: '50%',
+                        background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'var(--color-text-muted)', fontSize: '0.75rem',
+                      }}
+                    >
+                      Foto
+                    </div>
+                  )}
+                  <div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePhotoChange} disabled={uploadingPhoto} />
+                    {form.photoUrl && (
+                      <button type="button" className="btn btn-sm" style={{ marginLeft: '0.5rem' }} onClick={removePhoto}>
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {uploadingPhoto && <small className="text-muted">Mengunggah...</small>}
+              </div>
               <div className="form-group full">
                 <label>Nama</label>
                 <input
@@ -261,8 +319,8 @@ function UsersTab() {
               <button type="button" className="btn" onClick={closeModal}>
                 Batal
               </button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Menyimpan...' : 'Simpan'}
+              <button type="submit" className="btn btn-primary" disabled={submitting || uploadingPhoto}>
+                {submitting ? 'Menyimpan...' : uploadingPhoto ? 'Menunggu upload foto...' : 'Simpan'}
               </button>
             </div>
           </form>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
+import PasswordField from '../../components/common/PasswordField';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -27,7 +28,10 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="card login-card">
-        <h1 style={{ marginBottom: '1.25rem' }}>Pixelso ERP</h1>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <img src="/logo-pixelso-persegi.png" alt="Pixelso" style={{ height: '48px', width: 'auto' }} />
+        </div>
+        <h1 style={{ marginBottom: '1.25rem', textAlign: 'center' }}>Pixelso ERP</h1>
         <form onSubmit={handleSubmit}>
           {error && <div className="alert alert-error">{error}</div>}
           <div className="form-group full" style={{ marginBottom: '0.9rem' }}>
@@ -36,7 +40,7 @@ export default function LoginPage() {
           </div>
           <div className="form-group full" style={{ marginBottom: '1.1rem' }}>
             <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
             {submitting ? 'Masuk...' : 'Login'}

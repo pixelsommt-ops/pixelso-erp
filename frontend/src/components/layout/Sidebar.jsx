@@ -42,7 +42,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ open, onClose }) {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const location = useLocation();
   const items = NAV_ITEMS
     .filter((item) => !item.roles || item.roles.includes(role))
@@ -75,6 +75,16 @@ export default function Sidebar({ open, onClose }) {
           <button type="button" className="sidebar-close" onClick={onClose} aria-label="Tutup menu">
             &times;
           </button>
+        </div>
+        <div className="sidebar-profile">
+          {user?.photoUrl ? (
+            <img src={user.photoUrl} alt={user.name} className="sidebar-profile-photo" />
+          ) : (
+            <div className="sidebar-profile-photo sidebar-profile-photo-placeholder">
+              {(user?.name || '?').trim().charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span className="sidebar-profile-name">{user?.name}</span>
         </div>
         <ul className="sidebar-nav">
           {items.map((item) =>

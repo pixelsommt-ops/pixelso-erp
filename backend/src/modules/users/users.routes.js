@@ -21,5 +21,6 @@ router.get('/', authorize(ROLES.MANAGER, ROLES.FINANCE, ROLES.HRD), controller.l
 router.get('/:id', authorize(ROLES.MANAGER, ROLES.FINANCE, ROLES.HRD), controller.getById);
 router.post('/', authorize(ROLES.MANAGER), controller.create);
 router.put('/:id', authorize(ROLES.MANAGER), controller.update);
+router.post('/uploads', authorize(ROLES.MANAGER), controller.uploadPhoto);
 
 module.exports = router;

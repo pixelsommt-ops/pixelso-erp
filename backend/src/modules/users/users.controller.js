@@ -2,6 +2,7 @@
 
 const asyncHandler = require('../../common/utils/asyncHandler');
 const service = require('./users.service');
+const { saveUpload } = require('../../common/utils/fileUpload');
 
 const list = asyncHandler(async (req, res) => {
   const data = await service.list(req.query);
@@ -43,4 +44,9 @@ const deleteTeam = asyncHandler(async (req, res) => {
   res.json({ success: true, data: null });
 });
 
-module.exports = { list, getById, create, update, listRoles, listTeams, createTeam, deleteTeam };
+const uploadPhoto = asyncHandler(async (req, res) => {
+  const url = await saveUpload({ ...req.body, kind: 'photo' });
+  res.status(201).json({ success: true, data: { url } });
+});
+
+module.exports = { list, getById, create, update, listRoles, listTeams, createTeam, deleteTeam, uploadPhoto };

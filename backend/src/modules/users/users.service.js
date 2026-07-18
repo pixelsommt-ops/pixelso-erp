@@ -12,6 +12,7 @@ const SAFE_SELECT = {
   status: true,
   roleId: true,
   teamId: true,
+  photoUrl: true,
   createdAt: true,
   role: { select: { roleId: true, roleName: true } },
   team: { select: { teamId: true, name: true } },
@@ -51,7 +52,7 @@ async function getById(id) {
 }
 
 async function create(data) {
-  const { name, email, password, roleId, teamId, status, positionId, maritalStatus, dependentsCount } = data;
+  const { name, email, password, roleId, teamId, status, photoUrl, positionId, maritalStatus, dependentsCount } = data;
 
   if (!name || !email || !password || !roleId) {
     throw new ApiError(400, 'name, email, password, and roleId are required');
@@ -84,6 +85,7 @@ async function create(data) {
       roleId: Number(roleId),
       teamId: teamId ? Number(teamId) : undefined,
       status: status || 'active',
+      photoUrl: photoUrl || null,
       positionId: positionId ? Number(positionId) : undefined,
       maritalStatus: maritalStatus === 'K' ? 'K' : 'TK',
       dependentsCount: dependentsCount !== undefined ? Number(dependentsCount) : undefined,
@@ -93,7 +95,7 @@ async function create(data) {
 }
 
 async function update(id, data) {
-  const { name, email, password, roleId, teamId, status, positionId, maritalStatus, dependentsCount } = data;
+  const { name, email, password, roleId, teamId, status, photoUrl, positionId, maritalStatus, dependentsCount } = data;
 
   const user = await prisma.user.findUnique({ where: { userId: Number(id) } });
   if (!user) {
@@ -134,6 +136,7 @@ async function update(id, data) {
       ...(roleId ? { roleId: Number(roleId) } : {}),
       ...(teamId !== undefined ? { teamId: teamId ? Number(teamId) : null } : {}),
       ...(status ? { status } : {}),
+      ...(photoUrl !== undefined ? { photoUrl: photoUrl || null } : {}),
       ...(positionId !== undefined ? { positionId: positionId ? Number(positionId) : null } : {}),
       ...(maritalStatus !== undefined ? { maritalStatus } : {}),
       ...(dependentsCount !== undefined ? { dependentsCount: Number(dependentsCount) } : {}),

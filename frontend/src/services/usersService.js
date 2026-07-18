@@ -12,3 +12,6 @@ export const listRoles = () => apiClient.get(`${BASE}/roles`).then((res) => res.
 export const listTeams = () => apiClient.get(`${BASE}/teams`).then((res) => res.data);
 export const createTeam = (payload) => apiClient.post(`${BASE}/teams`, payload).then((res) => res.data);
 export const deleteTeam = (id) => apiClient.delete(`${BASE}/teams/${id}`).then((res) => res.data);
+
+export const uploadPhoto = (dataUrl, filename) =>
+  apiClient.post(`${BASE}/uploads`, { dataUrl, filename }).then((res) => res.data);
