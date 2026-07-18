@@ -48,7 +48,7 @@ async function getById(id) {
 }
 
 async function create(data) {
-  const { poDetailId, machineId, operatorId } = data;
+  const { poDetailId, machineId, operatorId, stage } = data;
 
   if (!poDetailId) {
     throw new ApiError(400, 'poDetailId is required');
@@ -86,6 +86,7 @@ async function create(data) {
       poDetailId: Number(poDetailId),
       machineId: machineId ? Number(machineId) : undefined,
       operatorId: operatorId ? Number(operatorId) : undefined,
+      stage: stage || undefined,
       status: TASK_STATUS.QUEUE,
     },
     include: TASK_INCLUDE,
@@ -93,7 +94,7 @@ async function create(data) {
 }
 
 async function update(id, data, currentUser) {
-  const { status, machineId, operatorId } = data;
+  const { status, machineId, operatorId, stage } = data;
 
   const task = await prisma.productionTask.findUnique({
     where: { taskId: Number(id) },
@@ -121,6 +122,7 @@ async function update(id, data, currentUser) {
       data: {
         ...(machineId !== undefined ? { machineId: machineId ? Number(machineId) : null } : {}),
         ...(operatorId !== undefined ? { operatorId: operatorId ? Number(operatorId) : null } : {}),
+        ...(stage !== undefined ? { stage: stage || null } : {}),
       },
       include: TASK_INCLUDE,
     });

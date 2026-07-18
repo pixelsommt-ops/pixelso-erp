@@ -10,7 +10,9 @@ import StatusBadge from '../../components/common/StatusBadge';
 import { formatDateTime } from '../../utils/format';
 import { TASK_STATUS_OPTIONS, TASK_STATUS_TRANSITIONS } from '../../utils/taskStatusFlow';
 
-const EMPTY_TASK_FORM = { poId: '', poDetailId: '', machineId: '', operatorId: '' };
+const EMPTY_TASK_FORM = { poId: '', poDetailId: '', machineId: '', operatorId: '', stage: '' };
+// Contoh umum, tapi field-nya tetap free-text - staf boleh isi istilah lain sesuai proses di lapangan.
+const STAGE_SUGGESTIONS = ['Cetak', 'Finishing', 'Potong', 'Laminasi', 'Sablon', 'Jahit'];
 const EMPTY_MACHINE_FORM = { name: '', type: '', capacity: '' };
 
 export default function ProductionPage() {
@@ -84,6 +86,7 @@ export default function ProductionPage() {
         poDetailId: Number(taskForm.poDetailId),
         machineId: taskForm.machineId ? Number(taskForm.machineId) : undefined,
         operatorId: hasRole('production') ? user.userId : taskForm.operatorId ? Number(taskForm.operatorId) : undefined,
+        stage: taskForm.stage || undefined,
       };
       await productionService.create(payload);
       closeTaskCreate();
@@ -121,6 +124,7 @@ export default function ProductionPage() {
     { key: 'taskId', label: 'ID' },
     { key: 'po', label: 'No. PO', render: (r) => r.poDetail?.productionOrder?.poNumber },
     { key: 'product', label: 'Produk', render: (r) => r.poDetail?.product?.name },
+    { key: 'stage', label: 'Tahap', render: (r) => r.stage || '-' },
     { key: 'machine', label: 'Mesin', render: (r) => r.machine?.name || '-' },
     { key: 'operator', label: 'Operator', render: (r) => r.operator?.name || '-' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
@@ -218,6 +222,27 @@ export default function ProductionPage() {
                   </select>
                 </div>
               )}
+              {selectedOrderDetail && (
+                <div className="form-group full">
+                  <label>Tahap (opsional)</label>
+                  <input
+                    type="text"
+                    list="stage-suggestions"
+                    placeholder="mis. Cetak, Finishing, Potong"
+                    value={taskForm.stage}
+                    onChange={(e) => setTaskForm({ ...taskForm, stage: e.target.value })}
+                  />
+                  <datalist id="stage-suggestions">
+                    {STAGE_SUGGESTIONS.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                  <small style={{ color: 'var(--text-muted, #666)' }}>
+                    Isi ini kalau item ini butuh lebih dari satu job ticket (mis. tahap cetak di satu mesin,
+                    finishing di mesin lain) - biar gampang dibedakan di daftar Job Ticket.
+                  </small>
+                </div>
+              )}
               <div className="form-group">
                 <label>Mesin</label>
                 <select
@@ -271,6 +296,10 @@ export default function ProductionPage() {
             <div>
               <div className="text-muted text-sm">Produk</div>
               <div>{detail.poDetail?.product?.name}</div>
+            </div>
+            <div>
+              <div className="text-muted text-sm">Tahap</div>
+              <div>{detail.stage || '-'}</div>
             </div>
             <div>
               <div className="text-muted text-sm">Status</div>

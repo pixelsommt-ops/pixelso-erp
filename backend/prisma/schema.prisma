@@ -435,6 +435,11 @@ model ProductionTask {
   startAt    DateTime? @map("start_at")
   finishAt   DateTime? @map("finish_at")
 
+  // NEW - label bebas (mis. "Cetak", "Finishing", "Potong") supaya beberapa job ticket untuk
+  // poDetailId yang sama (satu item butuh beberapa tahap dengan mesin/operator berbeda) bisa
+  // dibedakan di daftar Job Ticket - bukan enum, staf isi sesuai istilah yang dipakai di lapangan.
+  stage String?
+
   poDetail PoDetail @relation(fields: [poDetailId], references: [poDetailId])
   machine  Machine? @relation(fields: [machineId], references: [machineId])
   operator User?    @relation("operator", fields: [operatorId], references: [userId])
