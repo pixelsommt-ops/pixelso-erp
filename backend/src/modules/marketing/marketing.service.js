@@ -74,12 +74,19 @@ async function getChannelBreakdown(query) {
   return Array.from(byChannel.values()).sort((a, b) => b.orderCount - a.orderCount);
 }
 
+// from/to opsional - dipakai Dashboard Marketing untuk scope "repeat customer bulan ini"
+// (lihat dashboard.service.js#getMarketingSummary); tab Repeat Customer di halaman ini sendiri
+// tidak mengirim from/to, jadi tetap all-time seperti semula.
 async function getRepeatCustomers(query) {
   const minOrders = query.minOrders ? Number(query.minOrders) : 2;
+  const dateWhere =
+    query.from || query.to
+      ? { createdAt: { ...(query.from ? { gte: query.from } : {}), ...(query.to ? { lte: query.to } : {}) } }
+      : {};
 
   const customers = await prisma.customer.findMany({
     include: {
-      _count: { select: { productionOrders: { where: CONFIRMED_ORDER_WHERE } } },
+      _count: { select: { productionOrders: { where: { ...CONFIRMED_ORDER_WHERE, ...dateWhere } } } },
     },
   });
 

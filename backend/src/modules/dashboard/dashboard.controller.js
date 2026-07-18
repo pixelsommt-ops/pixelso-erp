@@ -28,4 +28,9 @@ const summary = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update, summary };
+const marketingSummary = asyncHandler(async (req, res) => {
+  const data = await service.getMarketingSummary();
+  res.json({ success: true, data });
+});
+
+module.exports = { list, getById, create, update, summary, marketingSummary };

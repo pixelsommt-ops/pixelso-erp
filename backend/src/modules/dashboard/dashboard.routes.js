@@ -9,6 +9,12 @@ const { ROLES } = require('../../common/constants');
 const router = Router();
 
 router.use(authenticate);
+
+// Ringkasan Dashboard Marketing (produk terlaris/repeat customer/campaign) - terbuka untuk
+// semua role login, beda dari sisa router ini yang manager-only. Harus didaftarkan sebelum
+// router.use(authorize(ROLES.MANAGER)) di bawah supaya tidak ikut kena gate itu.
+router.get('/marketing-summary', controller.marketingSummary);
+
 router.use(authorize(ROLES.MANAGER));
 
 router.get('/summary', controller.summary);

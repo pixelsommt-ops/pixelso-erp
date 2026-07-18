@@ -70,6 +70,9 @@ model User {
   payrollRunsCreated PayrollRun[]
   payrollItems       PayrollItem[]
 
+  workLinksCreated WorkLink[]
+  workLinkClicks   WorkLinkClick[]
+
   @@map("users")
 }
 
@@ -766,4 +769,37 @@ model PayrollItem {
 
   @@unique([payrollRunId, userId])
   @@map("payroll_items")
+}
+
+// ---------- Link Kerja (Dashboard) ----------
+// Link referensi kerja (web/YouTube/Instagram/TikTok) dibagikan manager, tampil di widget
+// Dashboard untuk semua role login - lihat workLinks.service.js untuk auto-fetch thumbnail/judul.
+
+model WorkLink {
+  linkId       Int      @id @default(autoincrement()) @map("link_id")
+  url          String   @db.VarChar(2048)
+  title        String? // keterangan singkat dari manager, atau judul halaman hasil auto-fetch kalau dikosongkan
+  thumbnailUrl String?  @map("thumbnail_url") @db.VarChar(2048)
+  platform     String   @default("web") // web | youtube | instagram | tiktok - dideteksi dari url, dipakai utk ikon fallback
+  createdById  Int      @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  createdBy User            @relation(fields: [createdById], references: [userId])
+  clicks    WorkLinkClick[]
+
+  @@map("work_links")
+}
+
+// Satu baris per klik (bukan upsert per user) - histori "siapa klik kapan" dipertahankan utuh
+// buat manager, bukan cuma status klik/belum.
+model WorkLinkClick {
+  clickId   Int      @id @default(autoincrement()) @map("click_id")
+  linkId    Int      @map("link_id")
+  userId    Int      @map("user_id")
+  clickedAt DateTime @default(now()) @map("clicked_at")
+
+  link WorkLink @relation(fields: [linkId], references: [linkId], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [userId])
+
+  @@map("work_link_clicks")
 }

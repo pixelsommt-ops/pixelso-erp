@@ -1,27 +1,133 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import * as dashboardService from '../../services/dashboardService';
 import useFetch from '../../hooks/useFetch';
 import useAuth from '../../hooks/useAuth';
 import StatusBadge from '../../components/common/StatusBadge';
 import NotificationsFeed from '../../components/common/NotificationsFeed';
+import WorkLinksWidget from '../../components/common/WorkLinksWidget';
 import { formatCurrency, formatDate, firstDayOfMonthISO, todayISODate } from '../../utils/format';
 
 export default function DashboardPage() {
   const { hasRole, user } = useAuth();
 
-  if (!hasRole('manager')) {
-    return (
-      <div>
-        <h1>Selamat datang, {user?.name}</h1>
-        <p className="text-muted">Berikut hal-hal yang mungkin butuh perhatian Anda.</p>
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <NotificationsFeed />
+  return (
+    <div>
+      {hasRole('manager') ? (
+        <ManagerDashboard />
+      ) : (
+        <div>
+          <h1>Selamat datang, {user?.name}</h1>
+          <p className="text-muted">Berikut hal-hal yang mungkin butuh perhatian Anda.</p>
+          <div className="card" style={{ marginTop: '1rem' }}>
+            <NotificationsFeed />
+          </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return <ManagerDashboard />;
+      <DashboardMarketingSection />
+      <WorkLinksWidget />
+    </div>
+  );
+}
+
+// Ringkasan Dashboard Marketing - terbuka untuk semua role login (lihat dashboard.routes.js),
+// bukan cuma manager. "Selengkapnya" mengarah ke halaman Marketing Analytics penuh, yang tetap
+// dibatasi role marketing/manager di sana - role lain akan lihat halaman kosong/error kalau klik,
+// sama seperti pola akses modul lain di sidebar yang disembunyikan tapi tidak diblokir di router.
+function DashboardMarketingSection() {
+  const fetcher = useCallback(() => dashboardService.getMarketingSummary(), []);
+  const { data, loading, error } = useFetch(fetcher, [fetcher]);
+
+  return (
+    <div style={{ marginTop: '1.5rem' }}>
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Dashboard Marketing</h2>
+
+      {loading && <div className="empty-state">Memuat...</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {data && (
+        <div className="grid grid-cols-2">
+          <div className="card">
+            <div className="page-header" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0 }}>10 Produk Terlaris (bulan ini)</h3>
+              <Link to="/marketing" className="text-sm">
+                Selengkapnya
+              </Link>
+            </div>
+            {data.topProducts.length === 0 ? (
+              <div className="empty-state">Belum ada data</div>
+            ) : (
+              <ol style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                {data.topProducts.map((p) => (
+                  <li key={p.productId} className="text-sm" style={{ padding: '0.25rem 0' }}>
+                    {p.name} <span className="text-muted">({p.totalQty} qty, {p.orderCount} order)</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="page-header" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0 }}>10 Besar Repeat Customer (bulan ini)</h3>
+              <Link to="/marketing" className="text-sm">
+                Selengkapnya
+              </Link>
+            </div>
+            {data.repeatCustomers.length === 0 ? (
+              <div className="empty-state">Belum ada data</div>
+            ) : (
+              <ol style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                {data.repeatCustomers.map((c) => (
+                  <li key={c.customerId} className="text-sm" style={{ padding: '0.25rem 0' }}>
+                    {c.name} <span className="text-muted">({c.orderCount} order)</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          <div className="card" style={{ gridColumn: '1 / -1' }}>
+            <div className="page-header" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Campaign Sedang Berjalan</h3>
+              <Link to="/marketing" className="text-sm">
+                Selengkapnya
+              </Link>
+            </div>
+            {data.activeCampaigns.length === 0 ? (
+              <div className="empty-state">Tidak ada campaign aktif</div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nama Campaign</th>
+                      <th>Channel</th>
+                      <th>Mulai</th>
+                      <th>Selesai</th>
+                      <th>Budget</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.activeCampaigns.map((c) => (
+                      <tr key={c.campaignId}>
+                        <td>{c.name}</td>
+                        <td>{c.channel || '-'}</td>
+                        <td>{formatDate(c.startDate)}</td>
+                        <td>{formatDate(c.endDate)}</td>
+                        <td>{formatCurrency(c.budget)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ManagerDashboard() {

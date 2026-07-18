@@ -41,6 +41,7 @@ const shiftRoutes = require('./modules/shift/shift.routes');
 const shiftAssignmentRoutes = require('./modules/shift/shiftAssignment.routes');
 const attendanceRoutes = require('./modules/attendance/attendance.routes');
 const payrollRoutes = require('./modules/payroll/payroll.routes');
+const workLinksRoutes = require('./modules/workLinks/workLinks.routes');
 
 const app = express();
 
@@ -122,6 +123,8 @@ app.use('/api/shifts', shiftRoutes);
 app.use('/api/shift-assignments', shiftAssignmentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/payroll', payrollRoutes);
+// Link Kerja - widget Dashboard, terbuka untuk semua role login (manager yang kelola CRUD-nya)
+app.use('/api/work-links', workLinksRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

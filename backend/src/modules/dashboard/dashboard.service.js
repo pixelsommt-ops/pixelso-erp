@@ -4,6 +4,7 @@
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
 const financeService = require('../finance/finance.service');
+const marketingService = require('../marketing/marketing.service');
 
 function parseRange(query) {
   const now = new Date();
@@ -74,6 +75,29 @@ async function getSummary(query) {
   };
 }
 
+// Ringkasan "Dashboard Marketing" - terbuka untuk semua role login (lihat dashboard.routes.js),
+// beda dari getSummary() di atas yang manager-only. Sengaja pakai fungsi marketing.service.js
+// yang sudah ada (bukan query baru) supaya definisi "produk terlaris"/"repeat customer" konsisten
+// satu sumber dengan halaman Marketing Analytics penuh.
+async function getMarketingSummary() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  // getTopProducts() pakai marketing.service.js#parseRange, yang mengharapkan from/to berupa
+  // string ("YYYY-MM-DD") lalu di-parse ulang sendiri di sana - Date object mentah bikin
+  // template string `${to}T23:59:59` jadi string tanggal tidak valid.
+  const fromStr = from.toISOString().slice(0, 10);
+  const toStr = to.toISOString().slice(0, 10);
+
+  const [topProducts, repeatCustomers, activeCampaigns] = await Promise.all([
+    marketingService.getTopProducts({ from: fromStr, to: toStr, limit: 10 }),
+    marketingService.getRepeatCustomers({ minOrders: 2, from, to }).then((list) => list.slice(0, 10)),
+    marketingService.list({ status: 'active' }),
+  ]);
+
+  return { topProducts, repeatCustomers, activeCampaigns };
+}
+
 // Generic CRUD pattern dipertahankan untuk konsistensi routing; list() default ke ringkasan dashboard.
 async function list(query) {
   return getSummary(query);
@@ -91,4 +115,4 @@ async function update() {
   throw new ApiError(400, 'No writable entity in Dashboard module');
 }
 
-module.exports = { list, getById, create, update, getSummary };
+module.exports = { list, getById, create, update, getSummary, getMarketingSummary };
