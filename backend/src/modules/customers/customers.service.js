@@ -3,6 +3,11 @@
 
 const prisma = require('../../db/prisma');
 const ApiError = require('../../common/errors/ApiError');
+const { PO_STATUS } = require('../../common/constants');
+
+// PO 'draft' belum dianggap order terkonfirmasi, jadi dikecualikan dari perhitungan
+// "terakhir order" - sama seperti marketing.service.js#CONFIRMED_ORDER_WHERE.
+const CONFIRMED_ORDER_WHERE = { status: { not: PO_STATUS.DRAFT } };
 
 const DEFAULT_PAGE_SIZE = 50;
 // Lebih tinggi dari batas wajar buat halaman list (production-orders.service.js pakai 200) -
@@ -80,6 +85,32 @@ async function getById(id) {
   };
 }
 
+// Customer yang order terakhirnya lebih lama dari N hari lalu - dipakai tab "Customer Tidak
+// Aktif" di frontend. Customer yang belum pernah order sama sekali (tidak ada baseline "terakhir
+// order") sengaja dikecualikan, bukan target fitur ini.
+async function getDormant({ days, segment }) {
+  const cutoffDays = Number(days) || 30;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - cutoffDays);
+
+  const customers = await prisma.customer.findMany({
+    where: segment ? { segment } : {},
+    include: {
+      productionOrders: { where: CONFIRMED_ORDER_WHERE, select: { createdAt: true } },
+    },
+  });
+
+  return customers
+    .filter((c) => c.productionOrders.length > 0)
+    .map(({ productionOrders, ...c }) => ({
+      ...c,
+      orderCount: productionOrders.length,
+      lastOrderAt: productionOrders.reduce((max, o) => (o.createdAt > max ? o.createdAt : max), productionOrders[0].createdAt),
+    }))
+    .filter((c) => c.lastOrderAt < cutoff)
+    .sort((a, b) => a.lastOrderAt - b.lastOrderAt);
+}
+
 async function create(data) {
   const { name, phone, segment, source } = data;
 
@@ -126,4 +157,4 @@ async function deleteCustomer(id) {
   return prisma.customer.delete({ where: { customerId } });
 }
 
-module.exports = { list, getById, create, update, deleteCustomer };
+module.exports = { list, getById, create, update, deleteCustomer, getDormant };

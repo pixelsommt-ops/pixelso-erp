@@ -8,11 +8,97 @@ import { formatDate } from '../../utils/format';
 
 const EMPTY_FORM = { name: '', phone: '', segment: '', source: '' };
 
+const SEGMENT_OPTIONS = [
+  { value: '', label: 'Semua segmen' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'Grosir 1', label: 'Grosir 1' },
+  { value: 'Grosir 2', label: 'Grosir 2' },
+];
+
+const DORMANT_DAY_OPTIONS = [10, 20, 30, 40, 50, 60];
+
+function daysSince(date) {
+  return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export default function CustomersPage() {
+  const [tab, setTab] = useState('list');
+  const [detailCustomer, setDetailCustomer] = useState(null); // read-only detail + order history, dipakai kedua tab
+
+  const openDetail = async (customer) => {
+    const { data } = await customersService.getById(customer.customerId);
+    setDetailCustomer(data);
+  };
+  const closeDetail = () => setDetailCustomer(null);
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1>Customer & CRM</h1>
+      </div>
+
+      <div className="tabs">
+        <button type="button" className={`tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
+          Daftar Customer
+        </button>
+        <button type="button" className={`tab ${tab === 'dormant' ? 'active' : ''}`} onClick={() => setTab('dormant')}>
+          Customer Tidak Aktif
+        </button>
+      </div>
+
+      {tab === 'list' && <CustomerListTab openDetail={openDetail} />}
+      {tab === 'dormant' && <DormantCustomersTab openDetail={openDetail} />}
+
+      {detailCustomer && (
+        <Modal title={detailCustomer.name} onClose={closeDetail}>
+          <div className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>
+            {detailCustomer.phone || '-'} &middot; {detailCustomer.segment || 'tanpa segmen'} &middot;{' '}
+            {detailCustomer.source || 'tanpa sumber'}
+            {detailCustomer.isRepeatCustomer && (
+              <span className="badge badge-success" style={{ marginLeft: '0.5rem' }}>
+                repeat customer
+              </span>
+            )}
+          </div>
+          <h3 style={{ fontSize: '0.95rem' }}>Riwayat Order ({detailCustomer.orderCount})</h3>
+          {detailCustomer.orderHistory.length === 0 ? (
+            <div className="empty-state">Belum ada order</div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>No. PO</th>
+                    <th>Status</th>
+                    <th>Dibuat</th>
+                    <th>Deadline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailCustomer.orderHistory.map((o) => (
+                    <tr key={o.poId}>
+                      <td>{o.poNumber}</td>
+                      <td>
+                        <StatusBadge status={o.status} />
+                      </td>
+                      <td>{formatDate(o.createdAt)}</td>
+                      <td>{formatDate(o.dueAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function CustomerListTab({ openDetail }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalCustomer, setModalCustomer] = useState(null); // create/edit form
-  const [detailCustomer, setDetailCustomer] = useState(null); // read-only detail + order history
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -43,13 +129,7 @@ export default function CustomersPage() {
     setModalCustomer(customer);
   };
 
-  const openDetail = async (customer) => {
-    const { data } = await customersService.getById(customer.customerId);
-    setDetailCustomer(data);
-  };
-
   const closeModal = () => setModalCustomer(null);
-  const closeDetail = () => setDetailCustomer(null);
 
   const handleDelete = async (customer, e) => {
     e.stopPropagation();
@@ -111,7 +191,7 @@ export default function CustomersPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Customer & CRM</h1>
+        <div />
         <button type="button" className="btn btn-primary" onClick={openCreate}>
           + Tambah Customer
         </button>
@@ -202,49 +282,63 @@ export default function CustomersPage() {
           </form>
         </Modal>
       )}
+    </div>
+  );
+}
 
-      {detailCustomer && (
-        <Modal title={detailCustomer.name} onClose={closeDetail}>
-          <div className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>
-            {detailCustomer.phone || '-'} &middot; {detailCustomer.segment || 'tanpa segmen'} &middot;{' '}
-            {detailCustomer.source || 'tanpa sumber'}
-            {detailCustomer.isRepeatCustomer && (
-              <span className="badge badge-success" style={{ marginLeft: '0.5rem' }}>
-                repeat customer
-              </span>
-            )}
-          </div>
-          <h3 style={{ fontSize: '0.95rem' }}>Riwayat Order ({detailCustomer.orderCount})</h3>
-          {detailCustomer.orderHistory.length === 0 ? (
-            <div className="empty-state">Belum ada order</div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>No. PO</th>
-                    <th>Status</th>
-                    <th>Dibuat</th>
-                    <th>Deadline</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detailCustomer.orderHistory.map((o) => (
-                    <tr key={o.poId}>
-                      <td>{o.poNumber}</td>
-                      <td>
-                        <StatusBadge status={o.status} />
-                      </td>
-                      <td>{formatDate(o.createdAt)}</td>
-                      <td>{formatDate(o.dueAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Modal>
-      )}
+function DormantCustomersTab({ openDetail }) {
+  const [days, setDays] = useState(30);
+  const [segment, setSegment] = useState('');
+  const [search, setSearch] = useState('');
+
+  const fetchDormant = useCallback(() => customersService.getDormant({ days, segment: segment || undefined }), [days, segment]);
+  const { data, loading, error } = useFetch(fetchDormant, [fetchDormant]);
+
+  const rows = (data || []).filter((c) => !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  const columns = [
+    { key: 'name', label: 'Nama' },
+    { key: 'phone', label: 'No. HP', render: (r) => r.phone || '-' },
+    { key: 'segment', label: 'Segmen', render: (r) => (r.segment ? <StatusBadge status={r.segment} /> : '-') },
+    { key: 'lastOrderAt', label: 'Order Terakhir', render: (r) => formatDate(r.lastOrderAt) },
+    { key: 'idleDays', label: 'Tidak Order', render: (r) => `${daysSince(r.lastOrderAt)} hari`, sortValue: (r) => daysSince(r.lastOrderAt) },
+    { key: 'orderCount', label: 'Total Order' },
+  ];
+
+  return (
+    <div>
+      <div className="filters">
+        <input
+          type="text"
+          placeholder="Cari nama..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          {DORMANT_DAY_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              Lebih dari {d} hari
+            </option>
+          ))}
+        </select>
+        <select value={segment} onChange={(e) => setSegment(e.target.value)}>
+          {SEGMENT_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        error={error}
+        rowKey="customerId"
+        onRowClick={openDetail}
+        emptyLabel="Tidak ada customer yang tidak order dalam rentang ini"
+      />
     </div>
   );
 }

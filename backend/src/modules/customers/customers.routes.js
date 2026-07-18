@@ -10,6 +10,9 @@ const router = Router();
 
 router.use(authenticate);
 
+// Didaftarkan sebelum '/:id' supaya "reports/dormant" tidak ketangkap sebagai :id.
+router.get('/reports/dormant', controller.getDormant);
+
 router.get('/', controller.list);
 router.get('/:id', controller.getById);
 router.post('/', controller.create);

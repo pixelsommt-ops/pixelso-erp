@@ -13,6 +13,11 @@ const getById = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const getDormant = asyncHandler(async (req, res) => {
+  const data = await service.getDormant(req.query);
+  res.json({ success: true, data });
+});
+
 const create = asyncHandler(async (req, res) => {
   const data = await service.create(req.body);
   res.status(201).json({ success: true, data });
@@ -28,4 +33,4 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   res.json({ success: true, data: null });
 });
 
-module.exports = { list, getById, create, update, deleteCustomer };
+module.exports = { list, getById, create, update, deleteCustomer, getDormant };
