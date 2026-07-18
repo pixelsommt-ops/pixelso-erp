@@ -144,9 +144,9 @@ function UsersTab() {
   const columns = [
     { key: 'name', label: 'Nama' },
     { key: 'email', label: 'Email' },
-    { key: 'role', label: 'Role', render: (r) => <StatusBadge status={r.role?.roleName} /> },
-    { key: 'team', label: 'Tim', render: (r) => r.team?.name || '-' },
-    { key: 'position', label: 'Jabatan', render: (r) => r.position?.name || '-' },
+    { key: 'role', label: 'Role', render: (r) => <StatusBadge status={r.role?.roleName} />, sortValue: (r) => r.role?.roleName || '' },
+    { key: 'team', label: 'Tim', render: (r) => r.team?.name || '-', sortValue: (r) => r.team?.name || '' },
+    { key: 'position', label: 'Jabatan', render: (r) => r.position?.name || '-', sortValue: (r) => r.position?.name || '' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'createdAt', label: 'Bergabung', render: (r) => formatDate(r.createdAt) },
     {

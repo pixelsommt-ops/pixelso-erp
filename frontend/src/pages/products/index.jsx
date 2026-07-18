@@ -345,9 +345,14 @@ export default function ProductsPage() {
 
   const columns = [
     { key: 'name', label: 'Nama Produk' },
-    { key: 'category', label: 'Kategori', render: (r) => r.category?.name || '-' },
+    { key: 'category', label: 'Kategori', render: (r) => r.category?.name || '-', sortValue: (r) => r.category?.name || '' },
     { key: 'unit', label: 'Satuan', render: (r) => r.unit || '-' },
-    { key: 'pricingMode', label: 'Mode Harga', render: (r) => modeLabelByKey.get(r.pricingMode) || r.pricingMode },
+    {
+      key: 'pricingMode',
+      label: 'Mode Harga',
+      render: (r) => modeLabelByKey.get(r.pricingMode) || r.pricingMode,
+      sortValue: (r) => modeLabelByKey.get(r.pricingMode) || r.pricingMode || '',
+    },
     { key: 'basePrice', label: 'Harga Retail', render: (r) => formatCurrency(r.basePrice) },
     ...(canManage
       ? [

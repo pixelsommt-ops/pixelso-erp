@@ -113,6 +113,27 @@ tbody tr:hover {
   background: #fafafa;
 }
 
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-sortable:hover {
+  color: var(--color-text);
+}
+
+.th-sort-icon {
+  display: inline-block;
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.th-sort-icon-active {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);

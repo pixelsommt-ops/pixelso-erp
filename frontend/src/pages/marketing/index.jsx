@@ -1,10 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import * as marketingService from '../../services/marketingService';
 import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import { formatCurrency, formatDate, firstDayOfMonthISO, todayISODate } from '../../utils/format';
+
+function filterRows(rows, search) {
+  if (!search.trim()) return rows;
+  const q = search.trim().toLowerCase();
+  return (rows || []).filter((row) => Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q)));
+}
 
 const TABS = [
   { key: 'campaigns', label: 'Campaign' },
@@ -209,8 +215,10 @@ function CampaignsView() {
 }
 
 function TopProductsView({ from, to }) {
+  const [search, setSearch] = useState('');
   const fetcher = useCallback(() => marketingService.getTopProducts({ from, to }), [from, to]);
   const { data, loading, error } = useFetch(fetcher, [fetcher]);
+  const rows = useMemo(() => filterRows(data, search), [data, search]);
 
   const columns = [
     { key: 'name', label: 'Produk' },
@@ -219,12 +227,21 @@ function TopProductsView({ from, to }) {
     { key: 'orderCount', label: 'Jumlah Order' },
   ];
 
-  return <DataTable columns={columns} rows={data} loading={loading} error={error} rowKey="productId" />;
+  return (
+    <div>
+      <div className="filters">
+        <input type="text" placeholder="Cari produk/kategori..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+      <DataTable columns={columns} rows={rows} loading={loading} error={error} rowKey="productId" />
+    </div>
+  );
 }
 
 function ChannelsView({ from, to }) {
+  const [search, setSearch] = useState('');
   const fetcher = useCallback(() => marketingService.getChannels({ from, to }), [from, to]);
   const { data, loading, error } = useFetch(fetcher, [fetcher]);
+  const rows = useMemo(() => filterRows(data, search), [data, search]);
 
   const columns = [
     { key: 'channel', label: 'Channel' },
@@ -232,13 +249,22 @@ function ChannelsView({ from, to }) {
     { key: 'totalQty', label: 'Total Qty' },
   ];
 
-  return <DataTable columns={columns} rows={data} loading={loading} error={error} rowKey="channel" />;
+  return (
+    <div>
+      <div className="filters">
+        <input type="text" placeholder="Cari channel..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+      <DataTable columns={columns} rows={rows} loading={loading} error={error} rowKey="channel" />
+    </div>
+  );
 }
 
 function RepeatCustomersView() {
   const [minOrders, setMinOrders] = useState(2);
+  const [search, setSearch] = useState('');
   const fetcher = useCallback(() => marketingService.getRepeatCustomers({ minOrders }), [minOrders]);
   const { data, loading, error } = useFetch(fetcher, [fetcher]);
+  const rows = useMemo(() => filterRows(data, search), [data, search]);
 
   const columns = [
     { key: 'name', label: 'Customer' },
@@ -250,19 +276,22 @@ function RepeatCustomersView() {
   return (
     <div>
       <div className="filters">
+        <input type="text" placeholder="Cari nama/no. HP..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="form-group">
           <label>Minimum Order</label>
           <input type="number" min="1" value={minOrders} onChange={(e) => setMinOrders(Number(e.target.value))} />
         </div>
       </div>
-      <DataTable columns={columns} rows={data} loading={loading} error={error} rowKey="customerId" />
+      <DataTable columns={columns} rows={rows} loading={loading} error={error} rowKey="customerId" />
     </div>
   );
 }
 
 function CohortView() {
+  const [search, setSearch] = useState('');
   const fetcher = useCallback(() => marketingService.getCohort(), []);
   const { data, loading, error } = useFetch(fetcher, [fetcher]);
+  const rows = useMemo(() => filterRows(data, search), [data, search]);
 
   const columns = [
     { key: 'cohortMonth', label: 'Bulan Akuisisi' },
@@ -271,5 +300,12 @@ function CohortView() {
     { key: 'repeatRate', label: 'Repeat Rate', render: (r) => `${(r.repeatRate * 100).toFixed(0)}%` },
   ];
 
-  return <DataTable columns={columns} rows={data} loading={loading} error={error} rowKey="cohortMonth" />;
+  return (
+    <div>
+      <div className="filters">
+        <input type="text" placeholder="Cari bulan akuisisi..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+      <DataTable columns={columns} rows={rows} loading={loading} error={error} rowKey="cohortMonth" />
+    </div>
+  );
 }
