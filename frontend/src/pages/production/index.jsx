@@ -123,6 +123,7 @@ export default function ProductionPage() {
   const taskColumns = [
     { key: 'taskId', label: 'ID' },
     { key: 'po', label: 'No. PO', render: (r) => r.poDetail?.productionOrder?.poNumber },
+    { key: 'customer', label: 'Customer', render: (r) => r.poDetail?.productionOrder?.customer?.name || '-' },
     { key: 'product', label: 'Produk', render: (r) => r.poDetail?.product?.name },
     { key: 'stage', label: 'Tahap', render: (r) => r.stage || '-' },
     { key: 'machine', label: 'Mesin', render: (r) => r.machine?.name || '-' },
@@ -292,6 +293,10 @@ export default function ProductionPage() {
             <div>
               <div className="text-muted text-sm">PO</div>
               <div>{detail.poDetail?.productionOrder?.poNumber}</div>
+            </div>
+            <div>
+              <div className="text-muted text-sm">Customer</div>
+              <div>{detail.poDetail?.productionOrder?.customer?.name || '-'}</div>
             </div>
             <div>
               <div className="text-muted text-sm">Produk</div>

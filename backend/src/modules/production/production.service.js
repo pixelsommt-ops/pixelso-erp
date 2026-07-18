@@ -19,7 +19,9 @@ const TASK_INCLUDE = {
   poDetail: {
     include: {
       product: { select: { productId: true, name: true } },
-      productionOrder: { select: { poId: true, poNumber: true, status: true } },
+      productionOrder: {
+        select: { poId: true, poNumber: true, status: true, customer: { select: { customerId: true, name: true } } },
+      },
     },
   },
   machine: true,
