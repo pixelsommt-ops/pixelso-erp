@@ -125,6 +125,23 @@ export default function ProductionPage() {
     { key: 'po', label: 'No. PO', render: (r) => r.poDetail?.productionOrder?.poNumber },
     { key: 'customer', label: 'Customer', render: (r) => r.poDetail?.productionOrder?.customer?.name || '-' },
     { key: 'product', label: 'Produk', render: (r) => r.poDetail?.product?.name },
+    {
+      key: 'referenceImage',
+      label: 'SS',
+      sortable: false,
+      render: (r) =>
+        r.poDetail?.referenceImageUrl ? (
+          <a href={r.poDetail.referenceImageUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={r.poDetail.referenceImageUrl}
+              alt="Screenshot produk"
+              style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }}
+            />
+          </a>
+        ) : (
+          '-'
+        ),
+    },
     { key: 'stage', label: 'Tahap', render: (r) => r.stage || '-' },
     { key: 'machine', label: 'Mesin', render: (r) => r.machine?.name || '-' },
     { key: 'operator', label: 'Operator', render: (r) => r.operator?.name || '-' },
@@ -301,6 +318,20 @@ export default function ProductionPage() {
             <div>
               <div className="text-muted text-sm">Produk</div>
               <div>{detail.poDetail?.product?.name}</div>
+            </div>
+            <div>
+              <div className="text-muted text-sm">Screenshot Produk</div>
+              {detail.poDetail?.referenceImageUrl ? (
+                <a href={detail.poDetail.referenceImageUrl} target="_blank" rel="noreferrer">
+                  <img
+                    src={detail.poDetail.referenceImageUrl}
+                    alt="Screenshot produk"
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, marginTop: 4 }}
+                  />
+                </a>
+              ) : (
+                <div>-</div>
+              )}
             </div>
             <div>
               <div className="text-muted text-sm">Tahap</div>
