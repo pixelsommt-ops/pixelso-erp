@@ -52,6 +52,7 @@ export default function ProductionOrdersPage() {
   const [newProductSubmitting, setNewProductSubmitting] = useState(false);
 
   const [detail, setDetail] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState('');
 
@@ -235,6 +236,7 @@ export default function ProductionOrdersPage() {
     const { data } = await productionOrdersService.getById(order.poId);
     setDetail(data);
     setTransitionError('');
+    setSelectedStatus('');
   };
   const closeDetail = () => setDetail(null);
 
@@ -270,6 +272,7 @@ export default function ProductionOrdersPage() {
     try {
       const { data } = await productionOrdersService.update(detail.poId, { status });
       setDetail(data);
+      setSelectedStatus('');
       reload();
     } catch (err) {
       setTransitionError(err?.response?.data?.message || 'Gagal mengubah status');
@@ -645,18 +648,32 @@ export default function ProductionOrdersPage() {
               <div className="text-muted text-sm" style={{ marginBottom: '0.4rem' }}>
                 Ubah status ke:
               </div>
+              {/* Dropdown, bukan deretan tombol - tombol berjajar rawan salah klik oleh operator
+                  (satu klik langsung eksekusi transisi status). Dropdown + tombol konfirmasi
+                  terpisah butuh dua langkah sengaja sebelum status benar-benar berubah. */}
               <div className="btn-group">
-                {nextStatuses.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={transitioning}
-                    onClick={() => transitionTo(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  disabled={transitioning}
+                >
+                  <option value="" disabled>
+                    Pilih status
+                  </option>
+                  {nextStatuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  disabled={transitioning || !selectedStatus}
+                  onClick={() => transitionTo(selectedStatus)}
+                >
+                  {transitioning ? 'Memproses...' : 'Ubah Status'}
+                </button>
               </div>
             </div>
           )}
