@@ -326,6 +326,10 @@ model PoDetail {
   materialId  Int?     @map("material_id")
   materialQty Decimal? @map("material_qty") @db.Decimal(14, 2)
 
+  // NEW - screenshot referensi produk yang dipesan, diupload staf saat buat PO di ERP (galeri/kamera
+  // hp/printscreen PC) - beda dari fileUrl (file desain final dari checkout storefront pelanggan).
+  referenceImageUrl String? @map("reference_image_url")
+
   productionOrder ProductionOrder  @relation(fields: [poId], references: [poId])
   product         Product          @relation(fields: [productId], references: [productId])
   material        Material?        @relation(fields: [materialId], references: [materialId])

@@ -11,10 +11,13 @@ import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import SearchableSelect from '../../components/common/SearchableSelect';
 import StatusBadge from '../../components/common/StatusBadge';
+import { compressImage } from '../../utils/compressImage';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { PO_STATUS_OPTIONS, PO_STATUS_TRANSITIONS } from '../../utils/poStatusFlow';
 
-const EMPTY_ITEM = { productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '', materialId: '', materialQty: '' };
+const EMPTY_ITEM = {
+  productId: '', qty: 1, widthCm: '', heightCm: '', specNote: '', materialId: '', materialQty: '', referenceImageUrl: '',
+};
 const EMPTY_FORM = { customerId: '', designerId: '', priority: 0, dueAt: '', notes: '', poDetails: [{ ...EMPTY_ITEM }] };
 
 // Ukuran di bawah ini kemungkinan besar salah ketik (mis. "100" ketulis "1") - bukan batas keras,
@@ -38,6 +41,7 @@ export default function ProductionOrdersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingScreenshot, setUploadingScreenshot] = useState({}); // { [itemIndex]: boolean }
 
   const [detail, setDetail] = useState(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -100,6 +104,7 @@ export default function ProductionOrdersPage() {
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setFormError('');
+    setUploadingScreenshot({});
     setCreateOpen(true);
   };
   const closeCreate = () => setCreateOpen(false);
@@ -112,9 +117,36 @@ export default function ProductionOrdersPage() {
   const addItem = () => setForm({ ...form, poDetails: [...form.poDetails, { ...EMPTY_ITEM }] });
   const removeItem = (index) => setForm({ ...form, poDetails: form.poDetails.filter((_, i) => i !== index) });
 
+  // Screenshot referensi produk dipesan - dari galeri, kamera hp, atau printscreen PC. Browser
+  // native <input type="file" accept="image/*"> sudah menawarkan ketiganya tanpa kode tambahan
+  // (mobile: pilihan Kamera/Galeri muncul otomatis; desktop: file browser biasa ke file screenshot).
+  const handleScreenshotChange = async (index, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFormError('');
+    setUploadingScreenshot((prev) => ({ ...prev, [index]: true }));
+    try {
+      const { dataUrl } = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, targetBytes: 500000 });
+      const { data } = await productionOrdersService.uploadReferenceImage(dataUrl, file.name);
+      updateItem(index, 'referenceImageUrl', data.url);
+    } catch (err) {
+      setFormError(err?.response?.data?.message || err?.message || 'Gagal mengunggah screenshot');
+    } finally {
+      setUploadingScreenshot((prev) => ({ ...prev, [index]: false }));
+      e.target.value = '';
+    }
+  };
+  const removeScreenshot = (index) => updateItem(index, 'referenceImageUrl', '');
+  const isUploadingAnyScreenshot = Object.values(uploadingScreenshot).some(Boolean);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    if (isUploadingAnyScreenshot) {
+      setFormError('Tunggu proses upload screenshot selesai dulu sebelum menyimpan.');
+      return;
+    }
 
     const suspiciouslySmall = form.poDetails.filter((item) => {
       if (!isAreaProduct(item.productId)) return false;
@@ -147,6 +179,7 @@ export default function ProductionOrdersPage() {
             : {}),
           specNote: item.specNote || undefined,
           ...(item.materialId ? { materialId: Number(item.materialId), materialQty: Number(item.materialQty) } : {}),
+          referenceImageUrl: item.referenceImageUrl || undefined,
         })),
       };
       if (role === 'manager') {
@@ -430,6 +463,51 @@ export default function ProductionOrdersPage() {
                     />
                   </div>
                 )}
+                <div className="form-group full">
+                  <label>Screenshot Produk (opsional)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {item.referenceImageUrl ? (
+                      <img
+                        src={item.referenceImageUrl}
+                        alt="Screenshot produk"
+                        style={{ width: '56px', height: '56px', borderRadius: 6, objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '56px', height: '56px', borderRadius: 6,
+                          background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'var(--color-text-muted)', fontSize: '0.7rem', textAlign: 'center',
+                        }}
+                      >
+                        SS
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleScreenshotChange(index, e)}
+                        disabled={uploadingScreenshot[index]}
+                      />
+                      {item.referenceImageUrl && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ marginLeft: '0.5rem' }}
+                          onClick={() => removeScreenshot(index)}
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {uploadingScreenshot[index] && <small className="text-muted">Mengunggah...</small>}
+                  <small style={{ color: 'var(--text-muted, #666)', display: 'block', marginTop: 4 }}>
+                    Bisa dari galeri foto, kamera hp, atau printscreen PC yang sudah disimpan sebagai file gambar.
+                  </small>
+                </div>
                 {form.poDetails.length > 1 && (
                   <div className="form-group full">
                     <button type="button" className="btn btn-sm btn-danger" onClick={() => removeItem(index)}>
@@ -447,8 +525,8 @@ export default function ProductionOrdersPage() {
               <button type="button" className="btn" onClick={closeCreate}>
                 Batal
               </button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Menyimpan...' : 'Simpan PO'}
+              <button type="submit" className="btn btn-primary" disabled={submitting || isUploadingAnyScreenshot}>
+                {submitting ? 'Menyimpan...' : isUploadingAnyScreenshot ? 'Menunggu upload screenshot...' : 'Simpan PO'}
               </button>
             </div>
           </form>
@@ -490,6 +568,7 @@ export default function ProductionOrdersPage() {
                   <th>Produk</th>
                   <th>Qty</th>
                   <th>Ukuran</th>
+                  <th>SS</th>
                   <th>Catatan</th>
                   <th>Material</th>
                   <th></th>
@@ -501,6 +580,19 @@ export default function ProductionOrdersPage() {
                     <td>{d.product?.name || productMap[d.productId]?.name}</td>
                     <td>{d.qty}</td>
                     <td>{d.size || '-'}</td>
+                    <td>
+                      {d.referenceImageUrl ? (
+                        <a href={d.referenceImageUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={d.referenceImageUrl}
+                            alt="Screenshot produk"
+                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }}
+                          />
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td>{d.specNote || '-'}</td>
                     <td>{d.materialId ? `${d.material?.name || materials.find((m) => m.materialId === d.materialId)?.name} (${d.materialQty})` : '-'}</td>
                     <td>

@@ -13,6 +13,8 @@ router.use(authenticate);
 router.get('/', controller.list);
 router.get('/:id', controller.getById);
 router.post('/', authorize(ROLES.DESIGNER, ROLES.MANAGER), controller.create);
+// Upload screenshot referensi produk (dipakai form Buat PO) - role sama dengan yang boleh buat PO.
+router.post('/uploads', authorize(ROLES.DESIGNER, ROLES.MANAGER), controller.uploadReferenceImage);
 // PUT dibiarkan terbuka untuk semua role login: manager approve (draft->approved),
 // inventory pindahkan pos->material->queue, dst - beragam role menjalankan transisi
 // berbeda di sepanjang lifecycle PO, hanya validitas transisi yang dijaga di service.

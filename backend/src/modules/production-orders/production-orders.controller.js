@@ -2,6 +2,7 @@
 
 const asyncHandler = require('../../common/utils/asyncHandler');
 const service = require('./production-orders.service');
+const { saveUpload } = require('../../common/utils/fileUpload');
 
 const list = asyncHandler(async (req, res) => {
   const data = await service.list(req.query);
@@ -28,4 +29,9 @@ const setDetailMaterial = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { list, getById, create, update, setDetailMaterial };
+const uploadReferenceImage = asyncHandler(async (req, res) => {
+  const url = await saveUpload({ ...req.body, kind: 'photo' });
+  res.status(201).json({ success: true, data: { url } });
+});
+
+module.exports = { list, getById, create, update, setDetailMaterial, uploadReferenceImage };

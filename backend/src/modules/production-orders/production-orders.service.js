@@ -196,6 +196,7 @@ async function create(data, currentUser) {
             widthCm,
             heightCm,
             fileUrl: item.fileUrl,
+            referenceImageUrl: item.referenceImageUrl,
             specNote: item.specNote,
             materialId: item.materialId ? Number(item.materialId) : undefined,
             materialQty: item.materialId ? Number(item.materialQty) : undefined,
