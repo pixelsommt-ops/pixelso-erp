@@ -4,7 +4,7 @@ import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
-import { formatDate } from '../../utils/format';
+import { formatDate, todayISODate } from '../../utils/format';
 
 const EMPTY_FORM = { name: '', phone: '', segment: '', source: '' };
 
@@ -296,6 +296,23 @@ function DormantCustomersTab({ openDetail }) {
 
   const rows = (data || []).filter((c) => !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase()));
 
+  const exportToExcel = async () => {
+    const XLSX = await import('xlsx');
+    const sheetRows = rows.map((r) => ({
+      Nama: r.name,
+      'No. HP': r.phone || '-',
+      Segmen: r.segment || '-',
+      'Order Terakhir': formatDate(r.lastOrderAt),
+      'Tidak Order (hari)': daysSince(r.lastOrderAt),
+      'Total Order': r.orderCount,
+    }));
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Customer Tidak Aktif');
+    const segmentSlug = (segment || 'semua-segmen').replace(/\s+/g, '-');
+    XLSX.writeFile(wb, `customer-tidak-aktif-${days}hari-${segmentSlug}-${todayISODate()}.xlsx`);
+  };
+
   const columns = [
     { key: 'name', label: 'Nama' },
     { key: 'phone', label: 'No. HP', render: (r) => r.phone || '-' },
@@ -328,6 +345,9 @@ function DormantCustomersTab({ openDetail }) {
             </option>
           ))}
         </select>
+        <button type="button" className="btn btn-sm" onClick={exportToExcel} disabled={rows.length === 0}>
+          Export ke Excel
+        </button>
       </div>
 
       <DataTable
