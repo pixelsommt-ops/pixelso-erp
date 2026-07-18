@@ -18,6 +18,9 @@ const EMPTY_SUPPLIER_FORM = { name: '', address: '', phone: '', contact: '' };
 export default function ProductsPage() {
   const { hasRole } = useAuth();
   const canManage = hasRole('manager', 'inventory');
+  // Designer boleh nambah produk baru (bukan edit/hapus - itu tetap manager/inventory saja) -
+  // dipakai juga oleh form Buat PO buat nambah produk on-the-fly.
+  const canCreateProduct = hasRole('manager', 'inventory', 'designer');
 
   const [tab, setTab] = useState('produk');
 
@@ -494,7 +497,7 @@ export default function ProductsPage() {
         <div>
           <div className="page-header">
             <h1 style={{ fontSize: '1rem' }}>Master Produk</h1>
-            {canManage && (
+            {canCreateProduct && (
               <button type="button" className="btn btn-primary" onClick={openCreate}>
                 + Tambah Produk
               </button>

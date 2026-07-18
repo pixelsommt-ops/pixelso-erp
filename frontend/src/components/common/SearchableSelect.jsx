@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 // mencari di antara ribuan opsi (mis. daftar customer) - cuma diam-diam loncat ke opsi yang
 // cocok. Komponen ini pakai <input> teks biasa (cursor kedip & teks ketikan kelihatan normal)
 // plus daftar hasil filter di bawahnya.
-export default function SearchableSelect({ options, value, onChange, placeholder = 'Cari...', required, disabled }) {
+export default function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Cari...',
+  required,
+  disabled,
+  // Opsional - dipanggil dengan teks yang diketik kalau tidak ada opsi yang cocok sama sekali,
+  // dipakai form Buat PO buat "produk belum ada? tambahkan" (lihat production-orders/index.jsx).
+  onCreateNew,
+  createLabel = (query) => `+ Tambah "${query}" baru`,
+}) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -27,14 +38,21 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = query.trim()
-    ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+  const trimmedQuery = query.trim();
+  const filtered = trimmedQuery
+    ? options.filter((o) => o.label.toLowerCase().includes(trimmedQuery.toLowerCase()))
     : options;
+  const showCreateNew = Boolean(onCreateNew && trimmedQuery && filtered.length === 0);
 
   const selectOption = (opt) => {
     onChange(String(opt.value));
     setQuery(opt.label);
     setOpen(false);
+  };
+
+  const handleCreateNew = () => {
+    setOpen(false);
+    onCreateNew(trimmedQuery);
   };
 
   const handleKeyDown = (e) => {
@@ -48,6 +66,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (open && filtered[highlight]) selectOption(filtered[highlight]);
+      else if (open && showCreateNew) handleCreateNew();
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -75,7 +94,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
       />
       {open && (
         <div className="searchable-select-menu">
-          {filtered.length === 0 && <div className="searchable-select-empty">Tidak ditemukan</div>}
+          {filtered.length === 0 && !showCreateNew && <div className="searchable-select-empty">Tidak ditemukan</div>}
           {filtered.map((opt, i) => (
             <div
               key={opt.value}
@@ -91,6 +110,17 @@ export default function SearchableSelect({ options, value, onChange, placeholder
               {opt.label}
             </div>
           ))}
+          {showCreateNew && (
+            <div
+              className="searchable-select-option searchable-select-create"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleCreateNew();
+              }}
+            >
+              {createLabel(trimmedQuery)}
+            </div>
+          )}
         </div>
       )}
     </div>

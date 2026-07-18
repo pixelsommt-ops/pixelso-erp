@@ -43,6 +43,14 @@ export default function ProductionOrdersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingScreenshot, setUploadingScreenshot] = useState({}); // { [itemIndex]: boolean }
 
+  // "Produk belum ada? tambahkan" - dipicu dari SearchableSelect di item Produk (lihat
+  // onCreateNew di bawah). newProductTarget nyimpen index item yang lagi dicari produknya,
+  // supaya setelah dibuat langsung ke-assign ke item itu (bukan cuma nambah ke Master Produk).
+  const [newProductTarget, setNewProductTarget] = useState(null); // { itemIndex } | null
+  const [newProductForm, setNewProductForm] = useState({ name: '', categoryId: '', unit: '', pricingMode: 'unit', basePrice: '' });
+  const [newProductError, setNewProductError] = useState('');
+  const [newProductSubmitting, setNewProductSubmitting] = useState(false);
+
   const [detail, setDetail] = useState(null);
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState('');
@@ -138,6 +146,34 @@ export default function ProductionOrdersPage() {
   };
   const removeScreenshot = (index) => updateItem(index, 'referenceImageUrl', '');
   const isUploadingAnyScreenshot = Object.values(uploadingScreenshot).some(Boolean);
+
+  const openNewProduct = (itemIndex, name) => {
+    setNewProductForm({ name, categoryId: '', unit: '', pricingMode: 'unit', basePrice: '' });
+    setNewProductError('');
+    setNewProductTarget({ itemIndex });
+  };
+  const closeNewProduct = () => setNewProductTarget(null);
+
+  const handleNewProductSubmit = async (e) => {
+    e.preventDefault();
+    setNewProductError('');
+    setNewProductSubmitting(true);
+    try {
+      const { data } = await productsService.create({
+        name: newProductForm.name,
+        unit: newProductForm.unit || undefined,
+        pricingMode: newProductForm.pricingMode,
+        basePrice: newProductForm.basePrice ? Number(newProductForm.basePrice) : 0,
+      });
+      setProducts((prev) => [...prev, data]);
+      updateItem(newProductTarget.itemIndex, 'productId', data.productId);
+      closeNewProduct();
+    } catch (err) {
+      setNewProductError(err?.response?.data?.message || 'Gagal menambah produk baru');
+    } finally {
+      setNewProductSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -379,20 +415,17 @@ export default function ProductionOrdersPage() {
               >
                 <div className="form-group">
                   <label>Produk</label>
-                  <select
+                  <SearchableSelect
                     required
+                    placeholder="Ketik nama produk..."
                     value={item.productId}
-                    onChange={(e) => updateItem(index, 'productId', e.target.value)}
-                  >
-                    <option value="" disabled>
-                      Pilih produk
-                    </option>
-                    {products.map((p) => (
-                      <option key={p.productId} value={p.productId}>
-                        {p.name} ({formatCurrency(p.basePrice)}/{p.unit})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(productId) => updateItem(index, 'productId', productId)}
+                    options={products.map((p) => ({
+                      value: p.productId,
+                      label: `${p.name} (${formatCurrency(p.basePrice)}/${p.unit || '-'})`,
+                    }))}
+                    onCreateNew={(name) => openNewProduct(index, name)}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Qty</label>
@@ -669,6 +702,67 @@ export default function ProductionOrdersPage() {
               <button type="button" className="btn" onClick={closeMaterialLink}>Batal</button>
               <button type="submit" className="btn btn-primary" disabled={materialLinkSubmitting}>
                 {materialLinkSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {newProductTarget && (
+        <Modal title="Tambah Produk Baru" onClose={closeNewProduct}>
+          <form onSubmit={handleNewProductSubmit}>
+            {newProductError && <div className="alert alert-error">{newProductError}</div>}
+            <p className="text-muted text-sm">
+              Produk langsung dipakai di item ini. Detail lain (kategori, harga grosir, dst) bisa dilengkapi nanti
+              lewat Master Produk.
+            </p>
+            <div className="form-grid">
+              <div className="form-group full">
+                <label>Nama Produk</label>
+                <input
+                  type="text"
+                  required
+                  value={newProductForm.name}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Satuan</label>
+                <input
+                  type="text"
+                  placeholder="mis. pcs, m2, lembar"
+                  value={newProductForm.unit}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, unit: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Mode Harga</label>
+                <select
+                  value={newProductForm.pricingMode}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, pricingMode: e.target.value })}
+                >
+                  {(pricingModes || [])
+                    .filter((m) => m.isActive || m.key === newProductForm.pricingMode)
+                    .map((m) => (
+                      <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="form-group full">
+                <label>Harga Retail</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Boleh dikosongkan dulu, isi 0"
+                  value={newProductForm.basePrice}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, basePrice: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="btn-group" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={closeNewProduct}>Batal</button>
+              <button type="submit" className="btn btn-primary" disabled={newProductSubmitting}>
+                {newProductSubmitting ? 'Menyimpan...' : 'Simpan & Pilih'}
               </button>
             </div>
           </form>
