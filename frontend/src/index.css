@@ -159,6 +159,7 @@ tbody tr:hover {
   font-size: 0.85rem;
   cursor: pointer;
   font-weight: 500;
+  text-decoration: none;
 }
 
 .btn:hover { background: #f3f4f6; }

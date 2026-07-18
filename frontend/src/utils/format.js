@@ -31,3 +31,9 @@ export function firstDayOfMonthISO() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
+
+export function waLink(phone, message) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  const normalized = digits.startsWith('0') ? `62${digits.slice(1)}` : digits;
+  return `https://wa.me/${normalized}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
+}

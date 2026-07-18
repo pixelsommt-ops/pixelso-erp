@@ -8,7 +8,7 @@ import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import Receipt from '../../components/common/Receipt';
-import { formatCurrency, formatDateTime } from '../../utils/format';
+import { formatCurrency, formatDateTime, waLink } from '../../utils/format';
 
 const EMPTY_FORM = { poId: '', discount: 0, dp: 0, paymentMethod: 'cash' };
 
@@ -19,6 +19,25 @@ function areaSizeLabel(item) {
   if (item.calcType !== 'area') return `x${item.qty}`;
   const suffix = item.minAreaApplied ? ` (min. 1 m²)` : ` (${item.areaM2?.toFixed(2)} m²)`;
   return `${item.size || ''} x${item.qty}${suffix}`;
+}
+
+// Pesan teks nota untuk tombol "Kirim Nota via WhatsApp" - buka wa.me dengan teks siap kirim,
+// staf tinggal klik "Kirim" manual (bukan API otomatis, jadi tidak berisiko nomor kena banned).
+function notaWhatsappMessage(detail, remaining) {
+  const itemLines = (detail.items || [])
+    .map((item) => `- ${item.productName} ${areaSizeLabel(item)}: ${formatCurrency(item.lineTotal)}`)
+    .join('\n');
+
+  return [
+    `*Nota Pesanan ${detail.productionOrder?.poNumber} - Pixelso*`,
+    'Terima kasih telah memesan di Pixelso.',
+    '',
+    itemLines,
+    '',
+    `*Total: ${formatCurrency(detail.total)}*`,
+    `DP dibayar: ${formatCurrency(detail.dp)}`,
+    `Sisa: ${formatCurrency(remaining)}`,
+  ].join('\n');
 }
 
 export default function PosPage() {
@@ -532,6 +551,16 @@ export default function PosPage() {
             <button type="button" className="btn btn-sm" onClick={() => window.print()}>
               Cetak Nota
             </button>
+            {detail.productionOrder?.customer?.phone && (
+              <a
+                className="btn btn-sm"
+                href={waLink(detail.productionOrder.customer.phone, notaWhatsappMessage(detail, remaining))}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Kirim Nota via WhatsApp
+              </a>
+            )}
             {detail.paidStatus !== 'void' && canVoid && (
               <button type="button" className="btn btn-danger btn-sm" disabled={actioning} onClick={handleVoid}>
                 Void Invoice
